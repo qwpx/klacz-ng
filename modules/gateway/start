@@ -1,3 +1,0 @@
-#!/bin/sh
-
-PYTHONPATH=../_common/ python gateway.py
