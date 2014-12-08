@@ -1,0 +1,2 @@
+#!/bin/sh
+PYTHONPATH="../_common" python hello.py

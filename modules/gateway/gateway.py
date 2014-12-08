@@ -1,74 +1,77 @@
 from twisted.words.protocols import irc
+from threading import Thread
 from twisted.internet import reactor, protocol
+import time, sys, json, rmq
 
-import time, sys, json
+class Rabbit(rmq.Rmq):
+    def callback(self, ch, method, props, body):
+        data = json.loads(body)
+        to = data['replyTo']
+        content = data['content']
+
+        self.ircbot.msg(to.encode('utf-8'), content.encode('utf-8'))
 
 class Gateway(irc.IRCClient):
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
 
     def connectionLost(self, reason):
-        print "bay"
         irc.IRCClient.connectionLost(self, reason)
 
-    # callbacks for events
-
     def signedOn(self):
-        """Called when bot has succesfully signed on to server."""
+        # TODO: send event to an exchange
         for channel in self.factory.channels:
-            print "Joining ", channel
             self.join(channel.encode('ascii'))
 
     def joined(self, channel):
-        """This will get called when the bot joins the channel."""
+        # TODO: send event to an exchange
+        pass
 
-    def privmsg(self, user, channel, msg):
-        """This will get called when the bot receives a message."""
+    def privmsg(self, user, channel, body):
         user = user.split('!', 1)[0]
 
-        # Check to see if they're sending me a private message
-        if channel == self.nickname:
-            msg = "It isn't nice to whisper!  Play nice with the group."
-            self.msg(user, msg)
-            return
+        msg = {
+            'replyTo' : user if self.nickname == channel else channel,
+            'from' : user
+            }
 
-        # Otherwise check to see if it is a message directed at me
-        if msg.startswith(self.nickname + ":"):
-            msg = "%s: I am a log bot" % user
-            self.msg(channel, msg)
+        if body.startswith(','):
+            words = body.split(' ')
+            command = words[0][1:]
+            msg["content"] = " ".join(words[1:])
+
+            self.factory.events_queue.publish('klacz.privmsg.' + command, json.dumps(msg), 'events')
+        else:
+            msg["content"] = body
+            self.factory.events_queue.publish('klacz.privmsg', json.dumps(msg), 'events')
 
     def action(self, user, channel, msg):
-        """This will get called when the bot sees someone do an action."""
-        user = user.split('!', 1)[0]
-
-    # irc callbacks
+        # TODO: send event to an exchange
+        pass
 
     def irc_NICK(self, prefix, params):
-        """Called when an IRC user changes their nickname."""
-        old_nick = prefix.split('!')[0]
-        new_nick = params[0]
-
-
-
-    # For fun, override the method that determines how a nickname is changed on
-    # collisions. The default method appends an underscore.
-    def alterCollidedNick(self, nickname):
-        """
-        Generate an altered version of a nickname that caused a collision in an
-        effort to create an unused related name for subsequent registration.
-        """
-        return nickname + '^'
-
-
+        # TODO: send event to an exchange
+        pass
 
 class GatewayFactory(protocol.ClientFactory):
     def __init__(self, channels, nickname):
-        self.channels = channels
-        self.nickname = nickname
+        self.channels     = channels
+        self.nickname     = nickname.encode('utf-8')
+        self.reciever     = Rabbit()
+        self.events_queue = rmq.Rmq()
 
     def buildProtocol(self, addr):
+        # TODO: wtf I don't even
         p = Gateway()
         p.factory = self
+        p.nickname = self.nickname
+
+        self.events_queue.exchange_declare('topic', 'events')
+        self.reciever.queue_declare('klacz.gateway')
+        self.reciever.ircbot = p
+        self.thr = Thread(target=lambda: self.reciever.start_recieving('klacz.gateway'))
+        self.thr.start()
+
         return p
 
     def clientConnectionLost(self, connector, reason):
@@ -94,5 +97,4 @@ class IrcBot:
 
 if __name__ == '__main__':
     data = open("settings.json").read()
-
     IrcBot(json.loads(data)).run()
