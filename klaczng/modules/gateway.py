@@ -79,7 +79,7 @@ class GatewayFactory(protocol.ClientFactory):
         self.reciever.queue_declare('klacz.gateway')
         self.reciever.ircbot = p
         self.thr = Thread(target=self.reciever.start_recieving,
-                          args=['klacz.gateway',])
+                          args=['klacz.gateway', ])
         self.thr.start()
 
         return p
@@ -105,4 +105,3 @@ class IrcBot(object):
 
         print "Starting reactor"
         reactor.run()
-
