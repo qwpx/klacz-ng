@@ -1,7 +1,11 @@
-from twisted.words.protocols import irc
+import json
 from threading import Thread
+
 from twisted.internet import reactor, protocol
-import time, sys, json, rmq
+from twisted.words.protocols import irc
+
+import rmq
+
 
 class Rabbit(rmq.Rmq):
     def callback(self, ch, method, props, body):
@@ -10,6 +14,7 @@ class Rabbit(rmq.Rmq):
         content = data['content']
 
         self.ircbot.msg(to.encode('utf-8'), content.encode('utf-8'))
+
 
 class Gateway(irc.IRCClient):
     def connectionMade(self):
@@ -31,19 +36,21 @@ class Gateway(irc.IRCClient):
         user = user.split('!', 1)[0]
 
         msg = {
-            'replyTo' : user if self.nickname == channel else channel,
-            'from' : user
-            }
+            'replyTo': user if self.nickname == channel else channel,
+            'from': user
+        }
 
         if body.startswith(','):
             words = body.split(' ')
             command = words[0][1:]
             msg["content"] = " ".join(words[1:])
 
-            self.factory.events_queue.publish('klacz.privmsg.' + command, json.dumps(msg), 'events')
+            self.factory.events_queue.publish('klacz.privmsg.' + command,
+                                              json.dumps(msg), 'events')
         else:
             msg["content"] = body
-            self.factory.events_queue.publish('klacz.privmsg', json.dumps(msg), 'events')
+            self.factory.events_queue.publish('klacz.privmsg', json.dumps(msg),
+                                              'events')
 
     def action(self, user, channel, msg):
         # TODO: send event to an exchange
@@ -53,11 +60,12 @@ class Gateway(irc.IRCClient):
         # TODO: send event to an exchange
         pass
 
+
 class GatewayFactory(protocol.ClientFactory):
     def __init__(self, channels, nickname):
-        self.channels     = channels
-        self.nickname     = nickname.encode('utf-8')
-        self.reciever     = Rabbit()
+        self.channels = channels
+        self.nickname = nickname.encode('utf-8')
+        self.reciever = Rabbit()
         self.events_queue = rmq.Rmq()
 
     def buildProtocol(self, addr):
@@ -69,7 +77,8 @@ class GatewayFactory(protocol.ClientFactory):
         self.events_queue.exchange_declare('topic', 'events')
         self.reciever.queue_declare('klacz.gateway')
         self.reciever.ircbot = p
-        self.thr = Thread(target=lambda: self.reciever.start_recieving('klacz.gateway'))
+        self.thr = Thread(target=self.reciever.start_recieving,
+                          args=('klacz.gateway'))
         self.thr.start()
 
         return p
@@ -81,12 +90,13 @@ class GatewayFactory(protocol.ClientFactory):
         print "connection failed:", reason
         reactor.stop()
 
-class IrcBot:
+
+class IrcBot(object):
     def __init__(self, settings):
-        self.server   = settings["server"]
-        self.port     = settings["port"]
-        self.channels = settings["channels"]
-        self.nickname = settings["nickname"]
+        self.server = settings['server']
+        self.port = settings['port']
+        self.channels = settings['channels']
+        self.nickname = settings['nickname']
 
     def run(self):
         self.f = GatewayFactory(self.channels, self.nickname)
@@ -95,6 +105,8 @@ class IrcBot:
         print "Starting reactor"
         reactor.run()
 
+
 if __name__ == '__main__':
-    data = open("settings.json").read()
+    with open('settings.json') as f:
+        data = f.read()
     IrcBot(json.loads(data)).run()
