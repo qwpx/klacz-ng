@@ -1,7 +1,10 @@
-from rmq import *
-import json, uuid
+import json
+import uuid
 
-class Hello(Rmq):
+import rmq
+
+
+class Hello(rmq.Rmq):
     def callback(self, ch, method, props, body):
         body = json.loads(body)
         body['content'] = 'Hello!'
