@@ -1,10 +1,11 @@
 import json
+
 from threading import Thread
 
 from twisted.internet import reactor, protocol
 from twisted.words.protocols import irc
 
-import rmq
+from klaczng import rmq
 
 
 class Rabbit(rmq.Rmq):
@@ -78,7 +79,7 @@ class GatewayFactory(protocol.ClientFactory):
         self.reciever.queue_declare('klacz.gateway')
         self.reciever.ircbot = p
         self.thr = Thread(target=self.reciever.start_recieving,
-                          args=('klacz.gateway'))
+                          args=['klacz.gateway', ])
         self.thr.start()
 
         return p
@@ -104,9 +105,3 @@ class IrcBot(object):
 
         print "Starting reactor"
         reactor.run()
-
-
-if __name__ == '__main__':
-    with open('settings.json') as f:
-        data = f.read()
-    IrcBot(json.loads(data)).run()
