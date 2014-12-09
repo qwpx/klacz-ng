@@ -1,0 +1,14 @@
+rabbitmq:
+    image: dockerfile/rabbitmq
+    ports:
+        - 5672:5672
+
+gateway:
+    build: .
+    command: bin/start-gateway
+    volumes:
+        - gateway.json:/srv/klaczng/gateway.json
+
+hello:
+    build: .
+    command: bin/start-hello 172.17.42.1
