@@ -2,8 +2,8 @@ import pika
 
 
 class Rmq(object):
-    def __init__(self):
-        parameters = pika.ConnectionParameters('localhost')
+    def __init__(self, uri='amqp://guest:guest@127.0.0.1:5672/'):
+        parameters = pika.URLParameters(uri)
         self.connection = pika.BlockingConnection(parameters)
         self.ex_channel = None
         self.pub_channel = None

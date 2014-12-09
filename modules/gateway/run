@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+import json
+import os
+import sys
+
+# add lib/python to path
+module_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(os.path.dirname(module_dir))
+lib_dir = os.path.sep.join((root_dir, 'lib', 'python'))
+sys.path.insert(0, lib_dir)
+print lib_dir
+
+
+import gateway
+from klaczng import utils
+
+def setup(cli_args, args, kwargs):
+    if not os.path.exists(cli_args.config):
+        raise Exception("Config file {} could not be loaded"
+                        .format(cli_args.config))
+    with open(cli_args.config) as f:
+        config = json.load(f)
+    args.append(config)
+    args.append(cli_args.uri)
+
+def target(config, uri):
+    bot = gateway.IrcBot(config, uri)
+    bot.run()
+
+module = utils.KlaczNGModule('gateway', target, setup)
+module.parser.add_argument('-c', '--config', default='gateway.json',
+                           help="Location of configuration file")
+module.run()
+
