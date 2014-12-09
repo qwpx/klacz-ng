@@ -3,7 +3,7 @@ rabbitmq:
 
 gateway:
     build: .
-    command: /srv/klaczng/modules/gateway/run -c gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
+    command: modules/gateway/run -c gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
     volumes:
         - gateway.json:/srv/klaczng/gateway.json
         - modules/:/srv/klaczng/modules/
