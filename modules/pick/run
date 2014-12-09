@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+# TODO fix this
+cd modules/pick
+PATH=$PATH:/opt/ghc/7.8.3/bin:/opt/cabal/1.20/bin
+alias cabal=cabal-1.20
+alias ghc=ghc-7.8.3
+
+cabal configure
+cabal install --builddir=/tmp/pick.dist/
+
+# TODO: fix this
+# wait for rabbitmq
+P=1
+while [ $P -ne 0 ]
+do
+  sleep 5
+  /tmp/pick.dist/build/pick/pick $1
+  P=$?
+done
