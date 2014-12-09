@@ -8,9 +8,12 @@ RUN apt-get -y update \
 
 RUN useradd -rm klaczng
 
-ADD . /srv/klaczng
-WORKDIR /srv/klaczng
+ADD lib /srv/klaczng/lib
+ADD modules /srv/klaczng/modules
+ADD vendor /srv/klaczng/vendor
 
+
+WORKDIR /srv/klaczng
 RUN pip install -r vendor/requirements.txt
 
 RUN chown -R klaczng:klaczng /srv/klaczng
