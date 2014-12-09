@@ -6,8 +6,6 @@ gateway:
     command: modules/gateway/run -c gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
     volumes:
         - gateway.json:/srv/klaczng/gateway.json
-        - modules/:/srv/klaczng/modules/
-        - lib/:/srv/klaczng/lib/
     links:
         - rabbitmq:rabbitmq
 
@@ -16,6 +14,3 @@ hello:
     command: modules/hello/run -u amqp://guest:guest@rabbitmq/ -l debug
     links:
         - rabbitmq:rabbitmq
-    volumes:
-        - modules:/srv/klaczng/modules/
-        - lib:/srv/klaczng/lib/
