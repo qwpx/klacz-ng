@@ -4,8 +4,6 @@ import json
 import os
 import sys
 
-import argparse
-
 # add lib/python to path
 module_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(os.path.dirname(module_dir))
@@ -15,20 +13,23 @@ print lib_dir
 
 
 import gateway
+from klaczng import utils
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', default='gateway.json',
-                    help="Location of configuration file")
-parser.add_argument('-u', '--uri', default='amqp://guest:guest@127.0.0.1:5672/',
-                    help="AMQP host URI")
-args = parser.parse_args()
-
-
-if __name__ == '__main__':
-    if not os.path.exists(args.config):
-        raise GatewayStartException('Gateway configuration file missing '
-                                    '({})'.format(args.config))
-    with open(args.config) as f:
+def setup(cli_args, args, kwargs):
+    if not os.path.exists(cli_args.config):
+        raise Exception("Config file {} could not be loaded"
+                        .format(cli_args.config))
+    with open(cli_args.config) as f:
         config = json.load(f)
-    gateway.IrcBot(config, args.uri).run()
+    args.append(config)
+    args.append(cli_args.uri)
+
+def target(config, uri):
+    bot = gateway.IrcBot(config, uri)
+    bot.run()
+
+module = utils.KlaczNGModule('gateway', target, setup)
+module.parser.add_argument('-c', '--config', default='gateway.json',
+                           help="Location of configuration file")
+module.run()
+
