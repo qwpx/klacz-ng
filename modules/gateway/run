@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+
+import json
+import os
+import sys
+
+import argparse
+
+# add lib/python to path
+module_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(os.path.dirname(module_dir))
+lib_dir = os.path.sep.join((root_dir, 'lib', 'python'))
+sys.path.insert(0, lib_dir)
+print lib_dir
+
+
+import gateway
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-c', '--config', default='gateway.json',
+                    help="Location of configuration file")
+args = parser.parse_args()
+
+
+if __name__ == '__main__':
+    if not os.path.exists(args.config):
+        raise GatewayStartException('Gateway configuration file missing '
+                                    '({})'.format(args.config))
+    with open(args.config) as f:
+        config = json.load(f)
+    gateway.IrcBot(config).run()
