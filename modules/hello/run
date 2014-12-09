@@ -4,20 +4,27 @@ import os
 import sys
 import uuid
 
-
-# TODO: fix this hack
-# This adds the parent dir to the PYTHONPATH
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import argparse
 
 
-from klaczng.modules import hello
+# add lib/python to path
+module_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(os.path.dirname(module_dir))
+lib_dir = os.path.sep.join((root_dir, 'lib', 'python'))
+sys.path.insert(0, lib_dir)
+
+
+import hello
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-u', '--uri', default='amqp://127.0.0.1:5672/',
+                    help="AMQP host URI")
+args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print 'Usage: {} queue_host'.format(sys.argv[0])
-        sys.exit(1)
-    t = hello.Hello(sys.argv[1])
+    t = hello.Hello(args.uri)
     queue = str(uuid.uuid4())
     t.queue_bind(queue, 'events', 'klacz.privmsg.hello')
     t.start_recieving(queue)

@@ -1,14 +1,16 @@
 rabbitmq:
     image: dockerfile/rabbitmq
-    ports:
-        - 5672:5672
 
 gateway:
     build: .
-    command: bin/start-gateway
+    command: modules/gateway/run -c gateway.json -u amqp://guest:guest@rabbitmq/
     volumes:
         - gateway.json:/srv/klaczng/gateway.json
+    links:
+        - rabbitmq:rabbitmq
 
 hello:
     build: .
-    command: bin/start-hello 172.17.42.1
+    command: modules/hello/run -u 172.17.42.1 amqp://guest:guest@rabbitmq/
+    links:
+        - rabbitmq:rabbitmq

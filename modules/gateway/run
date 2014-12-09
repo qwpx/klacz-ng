@@ -20,6 +20,8 @@ import gateway
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', default='gateway.json',
                     help="Location of configuration file")
+parser.add_argument('-u', '--uri', default='amqp://guest:guest@127.0.0.1:5672/',
+                    help="AMQP host URI")
 args = parser.parse_args()
 
 
@@ -29,4 +31,4 @@ if __name__ == '__main__':
                                     '({})'.format(args.config))
     with open(args.config) as f:
         config = json.load(f)
-    gateway.IrcBot(config).run()
+    gateway.IrcBot(config, args.uri).run()
