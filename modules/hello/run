@@ -19,6 +19,7 @@ def target(uri):
     t = hello.Hello(uri)
     queue = str(uuid.uuid4())
     t.queue_bind(queue, 'events', 'klacz.privmsg.hello')
+    t.exchange_declare('topic', 'events')
     t.start_recieving(queue)
 
 
