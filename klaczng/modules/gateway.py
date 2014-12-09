@@ -63,11 +63,11 @@ class Gateway(irc.IRCClient):
 
 
 class GatewayFactory(protocol.ClientFactory):
-    def __init__(self, channels, nickname):
+    def __init__(self, channels, nickname, queue_host):
         self.channels = channels
         self.nickname = nickname.encode('utf-8')
-        self.reciever = Rabbit()
-        self.events_queue = rmq.Rmq()
+        self.reciever = Rabbit(queue_host)
+        self.events_queue = rmq.Rmq(queue_host)
 
     def buildProtocol(self, addr):
         # TODO: wtf I don't even
@@ -98,9 +98,10 @@ class IrcBot(object):
         self.port = settings['port']
         self.channels = settings['channels']
         self.nickname = settings['nickname']
+        self.queue_host = settings['queue_host']
 
     def run(self):
-        self.f = GatewayFactory(self.channels, self.nickname)
+        self.f = GatewayFactory(self.channels, self.nickname, self.queue_host)
         reactor.connectTCP(self.server, self.port, self.f)
 
         print "Starting reactor"

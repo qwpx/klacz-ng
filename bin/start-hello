@@ -14,7 +14,10 @@ from klaczng.modules import hello
 
 
 if __name__ == '__main__':
-    t = hello.Hello()
+    if len(sys.argv) < 2:
+        print 'Usage: {} queue_host'.format(sys.argv[0])
+        sys.exit(1)
+    t = hello.Hello(sys.argv[1])
     queue = str(uuid.uuid4())
     t.queue_bind(queue, 'events', 'klacz.privmsg.hello')
     t.start_recieving(queue)

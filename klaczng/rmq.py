@@ -2,8 +2,8 @@ import pika
 
 
 class Rmq(object):
-    def __init__(self):
-        parameters = pika.ConnectionParameters('localhost')
+    def __init__(self, host='localhost'):
+        parameters = pika.ConnectionParameters(host)
         self.connection = pika.BlockingConnection(parameters)
         self.ex_channel = None
         self.pub_channel = None
