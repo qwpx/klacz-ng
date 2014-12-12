@@ -11,10 +11,4 @@ cabal install --builddir=/tmp/pick.dist/
 
 # TODO: fix this
 # wait for rabbitmq
-P=1
-while [ $P -ne 0 ]
-do
-  sleep 5
-  /tmp/pick.dist/build/pick/pick $1
-  P=$?
-done
+while ! /tmp/pick.dist/build/pick/pick $1; do sleep 5; done

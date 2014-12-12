@@ -5,4 +5,4 @@ alias cabal=cabal-1.20
 alias ghc=ghc-7.8.3
 
 cabal update
-cabal install --ghc-option=-j4 aeson amqp uuid
+cabal install --ghc-option=-j4 aeson amqp uuid --global
