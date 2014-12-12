@@ -2,7 +2,7 @@ rabbitmq:
     image: dockerfile/rabbitmq
 
 gateway:
-    build: .
+    image: klacz/base
     command: modules/gateway/run -c gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
     volumes:
         - gateway.json:/srv/klaczng/gateway.json
@@ -12,10 +12,18 @@ gateway:
         - rabbitmq:rabbitmq
 
 hello:
-    build: .
+    image: klacz/base
     command: modules/hello/run -u amqp://guest:guest@rabbitmq/ -l debug
     links:
         - rabbitmq:rabbitmq
     volumes:
         - modules:/srv/klaczng/modules/
         - lib:/srv/klaczng/lib/
+pick:
+    image: klacz/base
+    command: modules/pick/run amqp://guest:guest@rabbitmq/
+    links:
+        - rabbitmq:rabbitmq
+    volumes:
+        - modules:/srv/klaczng/modules/
+
