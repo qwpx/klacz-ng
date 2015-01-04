@@ -3,9 +3,9 @@ rabbitmq:
 
 gateway:
     image: klacz/base
-    command: modules/gateway/run -c gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
+    command: modules/gateway/run -c config/gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
     volumes:
-        - gateway.json:/srv/klaczng/gateway.json
+        - config/:/srv/klaczng/config/
         - modules/:/srv/klaczng/modules/
         - lib/:/srv/klaczng/lib/
     links:

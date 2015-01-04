@@ -29,7 +29,7 @@ def target(config, uri):
     bot.run()
 
 module = utils.KlaczNGModule('gateway', target, setup)
-module.parser.add_argument('-c', '--config', default='gateway.json',
+module.parser.add_argument('-c', '--config', default='config/gateway.json',
                            help="Location of configuration file")
 module.run()
 
