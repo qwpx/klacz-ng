@@ -9,7 +9,7 @@ ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 
 RUN apt-get -y update  \
-    && apt-get -y install python-pip python-dev software-properties-common
+    && apt-get -y install python-pip python-dev software-properties-common supervisor
 
 RUN apt-add-repository "deb http://ppa.launchpad.net/hvr/ghc/ubuntu precise main" \
     && apt-get -y update

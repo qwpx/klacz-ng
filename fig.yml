@@ -3,7 +3,7 @@ rabbitmq:
 
 gateway:
     image: klacz/base
-    command: modules/gateway/run -c config/gateway.json -u amqp://guest:guest@rabbitmq/ -l debug
+    command: supervisord -c config/gateway_supervisord.conf
     volumes:
         - config/:/srv/klaczng/config/
         - modules/:/srv/klaczng/modules/
