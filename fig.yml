@@ -3,7 +3,7 @@ rabbitmq:
 
 gateway:
     image: klacz/base
-    command: supervisord -c config/gateway_supervisord.conf
+    command: modules/gateway/run
     volumes:
         - config/:/srv/klaczng/config/
         - modules/:/srv/klaczng/modules/

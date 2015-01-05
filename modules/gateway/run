@@ -1,25 +1,6 @@
-#!/usr/bin/env python
-
-import json
-import os
-import sys
-import argparse
-
-import gateway
-
-parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', default='config/gateway.json',
-                    help="Location of the configuration file")
-parser.add_argument('-u', '--uri', default='amqp://guest:guest'
-                    '@127.0.0.1:5672/', help="AMQP host URI")
-cli_args = parser.parse_args()
-
-if not os.path.exists(cli_args.config):
-    raise Exception("Config file {} could not be loaded"
-                    .format(cli_args.config))
-
-with open(cli_args.config) as f:
-    config = json.load(f)
-
-bot = gateway.IrcBot(config, cli_args.uri)
-bot.run()
+#!/bin/bash
+echo wl ppz
+cd "$(dirname "$0")" #toplel
+echo siema co tam xD
+#TODO: remove -n?
+twistd -n gateway $@
