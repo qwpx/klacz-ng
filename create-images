@@ -1,0 +1,9 @@
+#!/bin/bash
+
+images="base python gateway hello haskell pick"
+
+for image in $images; do
+    cp images/Dockerfile_${image} ./Dockerfile
+    docker build -t klacz/${image} .
+    rm Dockerfile
+done

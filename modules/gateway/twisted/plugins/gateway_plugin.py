@@ -1,6 +1,6 @@
 from zope.interface import implements
 
-from twisted.python import usage
+from twisted.python import usage, log
 from twisted.plugin import IPlugin
 from twisted.application.service import IServiceMaker
 from twisted.application import internet, service
@@ -25,9 +25,6 @@ class KlaczServiceMaker(object):
     options = Options
 
     def makeService(self, options):
-        """
-        Construct a TCPServer from a factory defined in myproject.
-        """
         with open(options['config'], 'r') as f:
             cfg = json.loads(f.read())
 
@@ -38,7 +35,7 @@ class KlaczServiceMaker(object):
                 svc.makeIRC())\
                         .setServiceParent(mult)
         rmq = svc.makeRMQ()
-        #lel
+
         internet.TCPClient(svc.params.host, svc.params.port,
                 rmq).setServiceParent(mult)
         return mult

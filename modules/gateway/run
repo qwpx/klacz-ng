@@ -1,6 +1,4 @@
 #!/bin/bash
-echo wl ppz
-cd "$(dirname "$0")" #toplel
-echo siema co tam xD
+export PYTHONPATH=$(dirname $(readlink -f $0))/
 #TODO: remove -n?
-twistd -n gateway $@
+exec twistd -n gateway $@

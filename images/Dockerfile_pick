@@ -1,0 +1,13 @@
+FROM klacz/haskell
+
+RUN apt-get -y update  \
+    && apt-get -y install supervisor
+
+env PATH=/opt/ghc/7.8.3/bin:/opt/cabal/1.20/bin:${PATH}
+RUN cabal-1.20 update
+RUN cabal-1.20 install --ghc-option=-j4 aeson amqp uuid --global
+
+ADD modules/pick /srv/klaczng/pick
+WORKDIR /srv/klaczng/pick
+
+RUN cabal-1.20 configure && cabal-1.20 install --prefix /opt/klaczng/pick

@@ -1,0 +1,18 @@
+FROM ubuntu:14.04
+
+MAINTAINER Klacz-NG developrs, see CONTRIBUTORS in main source distribution
+
+RUN locale-gen en_US.UTF-8
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+RUN useradd -rm klaczng
+
+RUN mkdir /srv/klaczng
+RUN chown -R klaczng:klaczng /srv/klaczng
+
+RUN mkdir /opt/klaczng
+RUN chown -R klaczng:klaczng /opt/klaczng
+
