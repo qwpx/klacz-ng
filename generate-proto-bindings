@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+root=$(dirname $(readlink -f $0))
+pushd $root
+
+cd proto/
+protoc --python_out=../lib/python/klaczng/ irc.proto
+hprotoc --haskell_out=../lib/haskell/ irc.proto
+
+popd

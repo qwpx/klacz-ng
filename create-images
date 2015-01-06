@@ -1,5 +1,10 @@
 #!/bin/bash
 
+set -e
+
+root=$(dirname $(readlink -f $0))
+pushd $root
+
 images="base python gateway hello haskell pick"
 
 for image in $images; do
@@ -7,3 +12,5 @@ for image in $images; do
     docker build -t klacz/${image} .
     rm Dockerfile
 done
+
+popd

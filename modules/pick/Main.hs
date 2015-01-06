@@ -1,37 +1,32 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Network.AMQP
-import Data.UUID.V4
-import Data.Text as T
-import Data.Functor
 import Control.Concurrent.MVar
 import Control.Applicative
 import Control.Monad as M
-import Data.Text.Encoding
-import Data.List
-import System.Environment
-import Data.Aeson
 import Crypto.Hash.SHA1 as CH
+
 import Data.ByteString as B
-import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Lazy as BL
+import Data.Functor
+import Data.List
+import Data.Maybe
+import Data.Sequence (fromList)
+import Data.Text as T
+import Data.Text.Encoding
+import Data.UUID.V4
 
-data QMsg = QMsg {
-  from :: Text,
-  replyTo :: Text,
-  content :: Text
-  } deriving Show
+import Network.AMQP
 
-instance FromJSON QMsg where
-  parseJSON (Object v) = QMsg <$>
-                         v .: "from" <*>
-                         v .: "replyTo" <*>
-                         v .: "content"
-  parseJSON _ = M.mzero
+import System.Environment
 
-instance ToJSON QMsg where
-  toJSON (QMsg from replyTo content) =
-    object ["from" .= from, "replyTo" .= replyTo, "content" .= content]
+import Text.ProtocolBuffers.Basic (Utf8, utf8, toUtf8, defaultValue, uFromString)
+import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
+
+import IRC.UserCommand
+import qualified IRC.UserCommand as UC
+import IRC.GatewayCommand
+import qualified IRC.GatewayCommand as GC
 
 main :: IO ()
 main =
@@ -50,25 +45,39 @@ startModule conn = do
                             queueAutoDelete = True,
                             queueDurable = False}
   consumeMsgs ch (T.pack $ show uuid) NoAck (deliveryHandler conn)
-  bindQueue ch (T.pack $ show uuid) "events" "klacz.privmsg.pick"
+  bindQueue ch (T.pack $ show uuid) "events" "klacz.command"
   takeMVar done
   closeConnection conn
 
 deliveryHandler :: Connection -> (Message, Envelope) -> IO ()
 deliveryHandler conn (msg, metadata) = do
   chan <- openChannel conn
-  let json = decode (msgBody msg) in
-   case json :: Maybe QMsg of
-   Just m -> void $
-             publishMsg chan "" "klacz.gateway" newMsg {msgBody = process m }
-   Nothing -> return ()
+  case messageGet (msgBody msg) of
+    Right (userCommand, x) | BL.length x == 0 ->
+      void $ publishMsg chan "" "klacz.gateway" newMsg {msgBody = messagePut . process $ userCommand }
+    _ -> return ()
 
-process :: QMsg -> BL.ByteString
-process msg = encode QMsg {
-  from = from msg,
-  replyTo = replyTo msg,
-  content = pick $ content msg
+makeReplyTo :: Utf8 -> Utf8 -> GatewayCommand
+makeReplyTo replyTo reply = GatewayCommand {
+  GC.command = Just $ uFromString "PRIVMSG",
+  GC.params = fromList [replyTo],
+  GC.rest = Just $ reply
   }
+
+process :: UserCommand -> GatewayCommand
+process (UserCommand { UC.command = Just command,
+                       UC.replyTo = replyTo,
+                       UC.args = args}) =
+  let replyTo' = fromJust $ replyTo in
+  case utf8 command of
+    "pick" -> makeReplyTo replyTo' (textToUtf8 . pick . utf8ToText $ fromMaybe (uFromString "") args)
+    _ -> makeReplyTo replyTo' (uFromString "unknown command")
+
+utf8ToText :: Utf8 -> Text
+utf8ToText u = decodeUtf8 (BL.toStrict (utf8 u))
+
+textToUtf8 :: Text -> Utf8
+textToUtf8 t = let (Right u) = toUtf8 (BL.fromStrict (encodeUtf8 t)) in u
 
 pick :: Text -> Text
 pick = T.intercalate " < " . fmap fst . sortBy f . hashList . T.words where

@@ -20,7 +20,7 @@ executable pick
   -- other-modules:       
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.7 && <4.8, text >=1.2 && <1.3,
-                       bytestring >=0.10 && <0.11, amqp, aeson, uuid,
-                       cryptohash
+                       bytestring >=0.10 && <0.11, containers, amqp, uuid,
+                       cryptohash, protocol-buffers, klaczng-lib
   -- hs-source-dirs:      
   default-language:    Haskell2010

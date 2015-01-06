@@ -1,12 +1,14 @@
 from twisted.internet import protocol, defer, task
 from twisted.application import service
 from twisted.words.protocols import irc
-import json
+
 import pika
-#from pika import exceptions
+
 from pika.adapters import twisted_connection
 
-class IRC(irc.IRCClient):
+from klaczng.irc_pb2 import UserCommand, GatewayCommand
+
+class IRC(irc.IRCClient, object):
     def connectionMade(self):
         irc.IRCClient.connectionMade(self)
 
@@ -18,24 +20,17 @@ class IRC(irc.IRCClient):
             self.join(channel.encode('ascii'))
 
     def privmsg(self, user, channel, body):
-        user = user.split('!', 1)[0]
-
-        msg = {
-            'replyTo': user if self.nickname == channel else channel,
-            'from': user
-        }
-
         if body.startswith(','):
-            words = body.split(' ')
-            command = words[0][1:]
-            msg["content"] = " ".join(words[1:])
+            user_command = UserCommand()
+            user_command.caller = user.split('!', 1)[0]
+            user_command.replyTo = user if self.nickname == channel else channel
+            (command, args) = body[1:].split(' ', 1)
+            user_command.command = command
+            user_command.args = args
+            self.factory.service.pub('klacz.command', user_command.SerializeToString())
 
-            self.factory.service.pub('klacz.privmsg.' + command,
-                                              json.dumps(msg))
-        else:
-            msg["content"] = body
-            self.factory.service.pub('klacz.privmsg', json.dumps(msg))
-        #self.msg(channel, "test")
+    def handleCommand(self, command, prefix, params):
+        super(IRC, self).handleCommand(command, prefix, params)
 
 class IRCFactory(protocol.ReconnectingClientFactory):
     def __init__(self, svc, channels, nickname):
@@ -58,6 +53,7 @@ class IRCFactory(protocol.ReconnectingClientFactory):
     #def clientConnectionFailed(self, connector, reason):
         #print "connection failed:", reason
         #reactor.stop()
+
 class RMQFactory(protocol.ClientFactory):
     def __init__(self, svc, params):
         #protocol.ClientFactory.__init__(self)
@@ -76,9 +72,11 @@ class RMQFactory(protocol.ClientFactory):
 
         @defer.inlineCallbacks
         def _loop(q):
-            print 'loop'
             ch,method,properties,body = yield q.get()
-            yield self.service.msg(json.loads(body))
+            gateway_command = GatewayCommand()
+            gateway_command.ParseFromString(body)
+            yield self.service.handle_gateway_command(gateway_command)
+
         l = task.LoopingCall(_loop, queue_object)
         l.start(0.1) #lel
 
@@ -94,10 +92,14 @@ class IrcBot(service.Service):
         self.settings = settings
         self.params = pika.URLParameters(uri)
 
-    def msg(self, data):
-        print data
-        self.irc_factory.instance.msg(data['replyTo'].encode('utf-8'),
-                data['content'].encode('utf-8'))
+    def handle_gateway_command(self, gateway_command):
+        line = gateway_command.command
+        if len(gateway_command.params) > 0:
+            line += " %s" % ' '.join(gateway_command.params)
+        if gateway_command.HasField('rest'):
+            line += " :%s" % gateway_command.rest
+
+        self.irc_factory.instance.sendLine(line.encode("utf-8"))
 
     def pub(self, key, body):
         #TODO: wait for rmq connection

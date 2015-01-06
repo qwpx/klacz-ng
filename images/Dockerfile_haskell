@@ -10,3 +10,11 @@ RUN apt-get install -y --force-yes \
     ghc-7.8.3 \
     cabal-install-1.20 \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+env PATH=/opt/ghc/7.8.3/bin:/opt/cabal/1.20/bin:${PATH}
+RUN cabal-1.20 update
+RUN cabal-1.20 install protocol-buffers protocol-buffers-descriptor
+
+ADD lib/haskell/ /tmp/haskell/
+WORKDIR /tmp/haskell
+RUN cabal configure && cabal install --global

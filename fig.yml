@@ -6,6 +6,7 @@ gateway:
     command: /opt/klaczng/gateway/run -u amqp://guest:guest@rabbitmq/ -c /srv/klaczng/config/gateway.json
     volumes:
         - config/:/srv/klaczng/config/
+        - modules/gateway/:/opt/klaczng/gateway/
     links:
         - rabbitmq:rabbitmq
 

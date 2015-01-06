@@ -1,4 +1,4 @@
 #!/bin/bash
-export PYTHONPATH=$(dirname $(readlink -f $0))/
+export PYTHONPATH=$(dirname $(readlink -f $0))/:${PYTHONPATH}
 #TODO: remove -n?
 exec twistd -n gateway $@

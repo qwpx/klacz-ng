@@ -1,0 +1,22 @@
+package IRC;
+
+message IrcMessage {
+  optional string command = 1;
+  optional string prefix = 2;
+  repeated string params = 3;
+}
+
+message GatewayCommand {
+  optional string command = 1;
+  repeated string params = 2;
+  optional string rest = 3;
+}
+
+message UserCommand {
+  optional string caller = 1;
+  optional string replyTo = 2;
+  optional string command = 3;
+  optional string args = 4;
+}
+
+
