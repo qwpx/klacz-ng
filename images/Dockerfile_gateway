@@ -4,4 +4,8 @@ RUN pip install pika twisted argparse
 
 ADD modules/gateway/ /opt/klaczng/gateway/
 
+RUN chown -R klaczng:klaczng /opt/klaczng/
+
+WORKDIR /tmp/
+
 USER klaczng
