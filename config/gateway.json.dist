@@ -2,5 +2,6 @@
     "channels": ["#qwpx-dev"],
     "nickname": "klacz-ng",
     "server": "irc.freenode.org",
-    "port" : 6667
+    "port" : 6667,
+    "nickserv_password": ""
 }

@@ -7,11 +7,12 @@ import Control.Monad as M
 import Crypto.Hash.SHA1 as CH
 
 import Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
+import Data.ByteString.Lazy as BL
 import Data.Functor
 import Data.List
 import Data.Maybe
 import Data.Sequence (fromList)
+import Data.Ord
 import Data.Text as T
 import Data.Text.Encoding
 import Data.UUID.V4
@@ -24,9 +25,9 @@ import Text.ProtocolBuffers.Basic (Utf8, utf8, toUtf8, defaultValue, uFromString
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 
 import IRC.UserCommand
-import qualified IRC.UserCommand as UC
+import IRC.UserCommand as UC
 import IRC.GatewayCommand
-import qualified IRC.GatewayCommand as GC
+import IRC.GatewayCommand as GC
 
 main :: IO ()
 main =
@@ -57,21 +58,34 @@ deliveryHandler conn (msg, metadata) = do
       void $ publishMsg chan "" "klacz.gateway" newMsg {msgBody = messagePut . process $ userCommand }
     _ -> return ()
 
-makeReplyTo :: Utf8 -> Utf8 -> GatewayCommand
+makeReplyTo :: Text -> Text -> GatewayCommand
 makeReplyTo replyTo reply = GatewayCommand {
   GC.command = Just $ uFromString "PRIVMSG",
-  GC.params = fromList [replyTo],
-  GC.rest = Just $ reply
+  GC.params = fromList [textToUtf8 replyTo],
+  GC.rest = Just $ textToUtf8 reply
   }
 
 process :: UserCommand -> GatewayCommand
-process (UserCommand { UC.command = Just command,
-                       UC.replyTo = replyTo,
-                       UC.args = args}) =
-  let replyTo' = fromJust $ replyTo in
-  case utf8 command of
-    "pick" -> makeReplyTo replyTo' (textToUtf8 . pick . utf8ToText $ fromMaybe (uFromString "") args)
-    _ -> makeReplyTo replyTo' (uFromString "unknown command")
+process (UserCommand { UC.caller = Just caller,
+                       UC.command = Just command,
+                       UC.replyTo = Just replyTo,
+                       UC.args = Just args }) =
+  let (caller', command', replyTo', args') =
+        (utf8ToText caller, utf8ToText command, utf8ToText replyTo, utf8ToText args) in
+  case lookup command' functions of
+    Nothing -> makeReplyTo replyTo' "unknown command"
+    Just f -> f caller' replyTo' args'
+    where functions = [("pick", pickCommand), ("sage", sageCommand)]
+
+pickCommand :: Text -> Text -> Text -> GatewayCommand
+pickCommand _ replyTo args = makeReplyTo replyTo (pick args)
+
+sageCommand :: Text -> Text -> Text -> GatewayCommand
+sageCommand _ replyTo args = GatewayCommand {
+  GC.command = Just $ uFromString "KICK",
+  GC.params = fromList [textToUtf8 replyTo, textToUtf8 nick],
+  GC.rest = Just $ textToUtf8 (T.drop 1 reason) }
+  where (nick, reason) = T.breakOn " " args
 
 utf8ToText :: Utf8 -> Text
 utf8ToText u = decodeUtf8 (BL.toStrict (utf8 u))
@@ -80,8 +94,4 @@ textToUtf8 :: Text -> Utf8
 textToUtf8 t = let (Right u) = toUtf8 (BL.fromStrict (encodeUtf8 t)) in u
 
 pick :: Text -> Text
-pick = T.intercalate " < " . fmap fst . sortBy f . hashList . T.words where
-  f (_, a) (_, b) = a `compare` b
-
-hashList :: [Text] -> [(Text, B.ByteString)]
-hashList = fmap (\ x -> (x, CH.hash $ encodeUtf8 x))
+pick = T.intercalate " < " . sortBy (comparing (CH.hash . encodeUtf8)) . T.words where

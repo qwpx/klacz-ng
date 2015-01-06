@@ -16,6 +16,7 @@ class IRC(irc.IRCClient, object):
         irc.IRCClient.connectionLost(self, reason)
 
     def signedOn(self):
+        self.msg("NickServ", "IDENTIFY %s" % self.nickserv_password)
         for channel in self.factory.channels:
             self.join(channel.encode('ascii'))
 
@@ -35,16 +36,19 @@ class IRC(irc.IRCClient, object):
         super(IRC, self).handleCommand(command, prefix, params)
 
 class IRCFactory(protocol.ReconnectingClientFactory):
-    def __init__(self, svc, channels, nickname):
+    def __init__(self, svc, settings):
         #protocol.ReconnectingClientFactory.__init__(self)
         self.service = svc
-        self.channels = channels
-        self.nickname = nickname.encode('utf-8')
+        self.settings = settings
+        self.channels = self.settings['channels']
+        self.nickname = self.settings['nickname'].encode('utf-8')
+        self.nickserv_password = self.settings['nickserv_password'].encode('utf-8')
 
     def buildProtocol(self, addr):
         gateway = IRC()
         gateway.factory = self
         gateway.nickname = self.nickname
+        gateway.nickserv_password = self.nickserv_password
         self.instance = gateway
 
         return gateway
@@ -95,6 +99,7 @@ class IrcBot(service.Service):
         self.params = pika.URLParameters(uri)
 
     def handle_gateway_command(self, gateway_command):
+        print "got command: %s" % gateway_command
         line = gateway_command.command
         if len(gateway_command.params) > 0:
             line += " %s" % ' '.join(gateway_command.params)
@@ -108,9 +113,7 @@ class IrcBot(service.Service):
         return self.rmq_factory.channel.basic_publish('events', key, body)
 
     def makeIRC(self):
-        channels = self.settings['channels']
-        nickname = self.settings['nickname']
-        f = IRCFactory(self, channels, nickname)
+        f = IRCFactory(self, self.settings)
         self.irc_factory = f
         return f
 
