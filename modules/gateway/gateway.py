@@ -24,7 +24,9 @@ class IRC(irc.IRCClient, object):
             user_command = UserCommand()
             user_command.caller = user.split('!', 1)[0]
             user_command.replyTo = user if self.nickname == channel else channel
-            (command, args) = body[1:].split(' ', 1)
+            command_and_args = body[1:].split(' ', 1)
+            command = command_and_args[0]
+            args = "" if len(command_and_args) == 1 else command_and_args[1]
             user_command.command = command
             user_command.args = args
             self.factory.service.pub('klacz.command', user_command.SerializeToString())
