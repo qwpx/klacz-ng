@@ -45,6 +45,7 @@ class IRCFactory(protocol.ReconnectingClientFactory):
         self.nickserv_password = self.settings['nickserv_password'].encode('utf-8')
 
     def buildProtocol(self, addr):
+        self.resetDelay()
         gateway = IRC()
         gateway.factory = self
         gateway.nickname = self.nickname
@@ -60,7 +61,7 @@ class IRCFactory(protocol.ReconnectingClientFactory):
         #print "connection failed:", reason
         #reactor.stop()
 
-class RMQFactory(protocol.ClientFactory):
+class RMQFactory(protocol.ReconnectingClientFactory):
     def __init__(self, svc, params):
         #protocol.ClientFactory.__init__(self)
         self.service = svc
@@ -86,10 +87,14 @@ class RMQFactory(protocol.ClientFactory):
         l = task.LoopingCall(_loop, queue_object)
         l.start(0.1) #lel
 
+    def _ready_err(self, reason):
+        print "Connection to RabbitMQ failed, reason: %s" % reason
 
     def buildProtocol(self, addr):
+        self.resetDelay()
         proto = twisted_connection.TwistedProtocolConnection(self.params)
         proto.ready.addCallback(self._run)
+        proto.ready.addErrback(self._ready_err)
         proto.factory = self
         return proto
 
