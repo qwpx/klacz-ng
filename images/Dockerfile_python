@@ -1,9 +1,0 @@
-FROM klacz/base
-
-RUN apt-get -y update  \
-    && apt-get -y install python-pip python-dev python-protobuf software-properties-common
-
-ADD lib/python/ /tmp/python/
-WORKDIR /tmp/python
-RUN python setup.py install
-WORKDIR /

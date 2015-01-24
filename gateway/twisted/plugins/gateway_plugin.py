@@ -8,14 +8,11 @@ import json
 
 from gateway import IrcBot
 
-
 class Options(usage.Options):
     optParameters = [
-            ["config", "c", 'config/gateway.json',
-                "Location of the configuration file"],
-            ['uri', 'u', 'amqp://guest:guest@127.0.0.1:5672/',
-                "AMQP host URI"]
-        ]
+        ["config", "c", 'config/gateway.json',
+        "Location of the configuration file"],
+    ]
 
 
 class KlaczServiceMaker(object):
@@ -29,20 +26,13 @@ class KlaczServiceMaker(object):
             cfg = json.loads(f.read())
 
         mult = service.MultiService()
-        svc = IrcBot(cfg, options['uri'])
+        svc = IrcBot(cfg)
         svc.setServiceParent(mult)
         internet.TCPClient(cfg['server'], cfg['port'],
-                svc.makeIRC())\
-                        .setServiceParent(mult)
-        rmq = svc.makeRMQ()
-
-        internet.TCPClient(svc.params.host, svc.params.port,
-                rmq).setServiceParent(mult)
+                svc.makeIRC()).setServiceParent(mult)
         return mult
-
 
 # Now construct an object which *provides* the relevant interfaces
 # The name of this variable is irrelevant, as long as there is *some*
 # name bound to a provider of IPlugin and IServiceMaker.
-
 serviceMaker = KlaczServiceMaker()

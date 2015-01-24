@@ -1,30 +1,16 @@
-rabbitmq:
-    image: dockerfile/rabbitmq
-
 gateway:
-    image: klacz/gateway
-    command: /opt/klaczng/gateway/run -u amqp://guest:guest@rabbitmq/ -c /srv/klaczng/config/gateway.json
+    image: klacz/base
+    command: /opt/klaczng/gateway/run -c /srv/klaczng/config/gateway.json
     volumes:
         - config/:/srv/klaczng/config/
-        - modules/gateway/:/opt/klaczng/gateway/
-    links:
-        - rabbitmq:rabbitmq
+        - gateway/:/opt/klaczng/gateway/
 
-# hello:
-#     image: klacz/base
-#     command: /opt/klaczng/hello/run -u amqp://guest:guest@rabbitmq/ -l debug
+# pick:
+#     image: klacz/pick
+#     command: supervisord -n -c /srv/klaczng/config/pick_supervisord.conf
 #     links:
 #         - rabbitmq:rabbitmq
 #     volumes:
-#         - modules:/srv/klaczng/modules/
-#         - lib:/srv/klaczng/lib/
-
-pick:
-    image: klacz/pick
-    command: supervisord -n -c /srv/klaczng/config/pick_supervisord.conf
-    links:
-        - rabbitmq:rabbitmq
-    volumes:
-        - config/:/srv/klaczng/config/
-        - modules/pick:/srv/klaczng/pick
+#         - config/:/srv/klaczng/config/
+#         - modules/pick:/srv/klaczng/pick
 
