@@ -1,4 +1,6 @@
-module KlaczNG.Helpers(textFromByteString, textFromLazyByteString,
+module KlaczNG.Helpers(textFromBS, textFromLBS,
+                       textToBS, textToLBS,
+                       stringToBS, stringToLBS,
                        uFromText, uToText,
                        uFromByteString) where
 
@@ -9,17 +11,29 @@ import Data.Text.Encoding
 import Data.Text.Encoding.Error
 import Text.ProtocolBuffers.Basic
 
-textFromByteString :: BS.ByteString -> Text
-textFromByteString = decodeUtf8With lenientDecode
+textFromBS :: BS.ByteString -> Text
+textFromBS = decodeUtf8With lenientDecode
 
-textFromLazyByteString :: LBS.ByteString -> Text
-textFromLazyByteString = decodeUtf8With lenientDecode . LBS.toStrict
+textFromLBS :: LBS.ByteString -> Text
+textFromLBS = decodeUtf8With lenientDecode . LBS.toStrict
+
+textToBS :: Text -> BS.ByteString
+textToBS = encodeUtf8
+
+textToLBS :: Text -> LBS.ByteString
+textToLBS = LBS.fromStrict . encodeUtf8
+
+stringToBS :: String -> BS.ByteString
+stringToBS = textToBS . pack
+
+stringToLBS :: String -> LBS.ByteString
+stringToLBS = textToLBS . pack
 
 uFromText :: Text -> Utf8
 uFromText = uFromString . unpack
 
 uToText :: Utf8 -> Text
-uToText = textFromLazyByteString . utf8
+uToText = textFromLBS . utf8
 
 uFromByteString :: BS.ByteString -> Utf8
-uFromByteString = uFromText . textFromByteString
+uFromByteString = uFromText . textFromBS

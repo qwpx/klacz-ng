@@ -1,16 +1,8 @@
-gateway:
+klacz:
     image: klacz/base
-    command: /opt/klaczng/gateway/run -c /srv/klaczng/config/gateway.json
+    command: supervisord -n -c /srv/klaczng/config/supervisord.conf
     volumes:
         - config/:/srv/klaczng/config/
-        - gateway/:/opt/klaczng/gateway/
-
-# pick:
-#     image: klacz/pick
-#     command: supervisord -n -c /srv/klaczng/config/pick_supervisord.conf
-#     links:
-#         - rabbitmq:rabbitmq
-#     volumes:
-#         - config/:/srv/klaczng/config/
-#         - modules/pick:/srv/klaczng/pick
+        - gateway/:/srv/klaczng/gateway/
+        - stateless/:/srv/klaczng/stateless/
 

@@ -5,7 +5,8 @@ import Control.Exception.Lifted
 import Control.Exception.Base(SomeException)
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
 
 import Control.Concurrent
@@ -33,6 +34,8 @@ import Network.IRC
 import Network.RPC.Protopap.Server
 import Network.RPC.Protopap.Publisher
 
+import Options.Applicative
+
 import Text.ProtocolBuffers.Basic
 
 import KlaczNG.Helpers
@@ -43,23 +46,16 @@ import KlaczNG.IRC.Proto.UserCommand as UC
 import KlaczNG.IRC.Proto.SendGatewayMessageRequest 
 import KlaczNG.IRC.Proto.SendGatewayMessageResponse
 
-zmqRpcEndpoint = "tcp://*:9001"
-zmqPubEndpoint = "tcp://*:2137"
-
 bsCrLf = BS.pack [13, 10]
 hPutBSCrLf handle bs = BS.hPut handle bs >> BS.hPut handle bsCrLf
-
-botNickname = "klacz"
-botUser = "klacz"
-botRealName = "Klacz"
-botIrcHost = "localhost"
-botChannels = ["#qwpx-dev"]
 
 data GatewayEnv = GatewayEnv {
   _ircReaderChan :: TChan Message,
   _ircWriterChan :: TChan Message,
-  _pubSocket :: ZMQ.Socket ZMQ.Pub
-                }
+  _pubSocket :: ZMQ.Socket ZMQ.Pub,
+  _botNickname :: T.Text,
+  _botChannels :: [T.Text]
+  }
 
 $(makeLenses ''GatewayEnv)
 
@@ -81,26 +77,29 @@ ircReader handle chan = forever $ do
       atomically $ writeTChan chan msg
     Nothing -> error $ "couldn't parse irc line: " ++ show (BS.unpack line)
 
-type IRCGateway = ReaderT GatewayEnv IO
-runIRCGateway = runReaderT
+type IRCGateway = StateT GatewayEnv IO
+runIRCGateway = runStateT
 
 sendMessage :: Message -> IRCGateway ()
 sendMessage msg = do
-  writerChan <- view ircWriterChan
+  writerChan <- use ircWriterChan
   liftIO . atomically . writeTChan writerChan $ msg
 
 readMessage :: IRCGateway Message
 readMessage = do
-  readerChan <- view ircReaderChan
+  readerChan <- use ircReaderChan
   liftIO . atomically . readTChan $ readerChan
 
 registerToIrc :: IRCGateway ()
 registerToIrc = do
-  sendMessage (nick botNickname)
-  sendMessage (user botUser "8" "*" botRealName)
+  nickname <- textToBS <$> use botNickname
+  sendMessage (nick nickname)
+  sendMessage (user nickname "8" "*" nickname)
 
 joinBotChannels :: Message -> IRCGateway ()
-joinBotChannels _ = mapM_ (sendMessage . joinChan) botChannels
+joinBotChannels _ = do
+  channels <- use botChannels
+  mapM_ (sendMessage . joinChan . textToBS) channels
 
 handlePing :: Message -> IRCGateway ()
 handlePing pingMessage = case msg_params pingMessage of
@@ -119,8 +118,8 @@ maybeGatewayAction ircMessage = do
     Nothing -> return ()
     Just act -> act ircMessage
 
-parseCommand :: Message -> Maybe UserCommand
-parseCommand ircMessage = do
+parseCommand :: T.Text -> Message -> Maybe UserCommand
+parseCommand nickname ircMessage = do
   prefix <- msg_prefix ircMessage
   caller <- case prefix of
     NickName nick _ _ -> Just nick
@@ -128,14 +127,14 @@ parseCommand ircMessage = do
   (target, msg) <- case msg_params ircMessage of
     (a:b:_) -> Just (a, b)
     _       -> Nothing
-  let msgText = textFromByteString msg
+  let msgText = textFromBS msg
   when (T.null msgText) $ Nothing
   when (T.index msgText 0 /= ',') $ Nothing
   let (cmd, args) = T.breakOn (T.pack " ") (T.drop 1 msgText)
       args' = T.drop 1 args
   return $ UserCommand {
     UC.caller = Just $ uFromByteString caller,
-    UC.replyTo = Just $ if target == botNickname
+    UC.replyTo = Just $ if target == textToBS nickname
                         then uFromByteString caller
                         else uFromByteString target,
     UC.command = Just $ uFromText cmd,
@@ -144,18 +143,20 @@ parseCommand ircMessage = do
 
 maybePublishCommand :: Message -> IRCGateway ()
 maybePublishCommand ircMessage = do
+  nickname <- use botNickname
   case msg_command ircMessage of
-    "PRIVMSG" -> maybe (return ()) publishUserCommand $ parseCommand ircMessage
+    "PRIVMSG" -> maybe (return ()) publishUserCommand $
+                 parseCommand nickname ircMessage
     _ -> return ()
   where publishUserCommand command = do
           liftIO $ putStrLn ("Publishing " ++ show command)
-          sock <- view pubSocket
+          sock <- use pubSocket
           rpcPublish sock "UserCommand" command
 
 publishMessage :: Message -> IRCGateway ()
 publishMessage ircMessage = do
   let ircMessageProto = messageToIrcMessageProto ircMessage
-  sock <- view pubSocket
+  sock <- use pubSocket
   rpcPublish sock "IrcMessage" ircMessageProto
   return ()
 
@@ -212,24 +213,28 @@ gatewayRPCServer writerChan sock = do
     handleRPCCall serviceDef sock
 
 
-start handle = do
+start flags handle = do
   readerChan <- atomically $ newTChan
   forkChild "irc reader" $ ircReader handle readerChan
 
   writerChan <- atomically $ newTChan
   forkChild "irc writer" $ ircWriter handle writerChan
-
-  bracket create destroy $ \(ctx, rpcSock, pubSock) -> do
-    forkChild "rpc server" $ gatewayRPCServer writerChan rpcSock
-    let env = GatewayEnv readerChan writerChan pubSock
-    runIRCGateway gateway env
-    return ()
-  where create = do
+  let rpcE = flagZmqRpcEndpoint flags
+      pubE = flagZmqPubEndpoint flags
+      nickname = T.pack $ flagNickname flags
+      channels = T.split (==',') . T.pack $ flagBotChannels flags
+  bracket (create rpcE pubE) destroy $
+    \(ctx, rpcSock, pubSock) -> do
+      forkChild "rpc server" $ gatewayRPCServer writerChan rpcSock
+      let env = GatewayEnv readerChan writerChan pubSock nickname channels
+      runIRCGateway gateway env
+      return ()
+  where create rpcE pubE = do
           ctx <- ZMQ.context
           rpcSock <- ZMQ.socket ctx ZMQ.Rep
-          ZMQ.bind rpcSock zmqRpcEndpoint
+          ZMQ.bind rpcSock rpcE
           pubSock <- ZMQ.socket ctx ZMQ.Pub
-          ZMQ.bind pubSock zmqPubEndpoint
+          ZMQ.bind pubSock pubE
           return (ctx, rpcSock, pubSock)
         destroy (ctx, rpcSock, pubSock) = do
           ZMQ.close rpcSock
@@ -244,16 +249,53 @@ start handle = do
                 Right _ -> "Success" in
           atomically $ putTMVar childDiesTMVar (name ++ ": " ++ msg)
 
+-- zmqRpcEndpoint = "tcp://*:9001"
+-- zmqPubEndpoint = "tcp://*:2137"
+-- botNickname = "klacz"
+-- botUser = "klacz"
+-- botRealName = "Klacz"
+-- botIrcHost = "irc.freenode.net"
+-- botChannels = ["#qwpx-dev", "#qwpx"]
+
+data Flags = Flags {
+  flagZmqRpcEndpoint :: String,
+  flagZmqPubEndpoint :: String,
+  flagIrcServer :: String,
+  flagNickname :: String,
+  flagBotChannels :: String
+  }
+
+flags = Flags
+        <$> strOption (long "zmq-rpc-endpoint"
+                       <> metavar "RPC_ENDPOINT"
+                       <> help "Address of GatewayService RPC")
+        <*> strOption (long "zmq-pub-endpoint"
+                       <> metavar "PUB_ENDPOINT"
+                       <> help "Address of Gateway Pub stream")
+        <*> strOption (long "server"
+                       <> metavar "SERVER"
+                       <> help "Address of IRC server to join")
+        <*> strOption (long "nickname"
+                       <> metavar "NICK"
+                       <> help "Bot nickname")
+        <*> strOption (long "channels"
+                       <> metavar "CHANNEL1,CHANNEL2,..."
+                       <> help "Comma-separated list of IRC channels to join")
+
+flagsOpts = info (helper <*> flags)
+            ( fullDesc
+              <> progDesc "Run gateway"
+              <> header "gateway - klacz irc frontend" )
 
 main :: IO ()
-main = withSocketsDo $ do
-  addrs <- hostAddresses <$> getHostByName botIrcHost
+main = execParser flagsOpts >>= \flags -> withSocketsDo $ do
+  addrs <- hostAddresses <$> getHostByName (flagIrcServer flags)
   when (null addrs) $ error "unknown address"
   sock <- socket AF_INET Stream 0
   connect sock (SockAddrInet (toEnum 6667) (head addrs))
   handle <- socketToHandle sock ReadWriteMode
   hSetBuffering handle LineBuffering
-  start handle
+  start flags  handle
   s <- atomically $ takeTMVar childDiesTMVar
   putStrLn $ "Child died: " ++ s
   return ()

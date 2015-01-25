@@ -29,6 +29,8 @@ import Network.RPC.Protopap.Client
 import Text.ProtocolBuffers.Basic (Utf8, utf8, toUtf8, defaultValue, uFromString)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 
+import Options.Applicative as Opt
+
 import System.Environment
 import qualified System.ZMQ4 as ZMQ
 
@@ -60,13 +62,8 @@ instance MonadReader Stateless where
 
 instance MonadBaseControl IO Stateless where
   type StM Stateless a = a
-  liftBaseWith m = do
-    r <- (ask :: Stateless StatelessEnv)
-    liftIO $ m (runInBaseWith r)
-    where runInBaseWith :: StatelessEnv -> (forall a. Stateless a -> IO a)
-          runInBaseWith r m' = runStateless m' r
-  restoreM a = return a
-
+  liftBaseWith f = Stateless $ liftBaseWith $ \q -> f (q . unStateless)
+  restoreM = Stateless . restoreM
 
 instance ZMQRPCClient Stateless where
   withConnectedSocket m = do
@@ -133,7 +130,7 @@ subscriberDef = makeSubscriberDefinition [
   ("UserCommand", RPCSubHandler handleUserCommand)
   ]
 
-subscribe pubEndpoint rpcEndpoint = do
+subscribe rpcEndpoint pubEndpoint = do
   bracket create destroy $ \(_, sock) -> do
     runStateless (subscriberLoop sock) (StatelessEnv rpcEndpoint)
     return ()
@@ -154,10 +151,26 @@ subscriberLoop sock = forever $ do
     Left err -> liftIO $ Prelude.putStrLn $ "Got error: " ++ err
     Right () -> return ()
 
+
+data Flags = Flags {
+  zmqRpcEndpoint :: String,
+  zmqPubEndpoint :: String
+  }
+
+flags = Flags
+        <$> strOption (long "zmq-rpc-endpoint"
+                       <> metavar "RPC_ENDPOINT"
+                       <> help "Address of GatewayService RPC")
+        <*> strOption (long "zmq-pub-endpoint"
+                       <> metavar "PUB_ENDPOINT"
+                       <> help "Address of Gateway Pub stream")
+
+flagsOpts = info (helper <*> flags)
+            ( fullDesc
+              <> progDesc "Run module"
+              <> header "stateless - klacz module providing statless bot functions" )
+
 main :: IO ()
-main = do
-  args <- getArgs
-  let (pubEndpoint, rpcEndpoint) = case args of
-        (pe:re:_) -> (pe, re)
-        _ -> error "too few arguments, usage: stateless zmqPubEndpoint zmqRpcEndpoint"
-  subscribe pubEndpoint rpcEndpoint
+main = execParser flagsOpts >>= \(Flags zmqRpcEndpoint zmqPubEndpoint) ->
+  subscribe zmqRpcEndpoint zmqPubEndpoint
+  

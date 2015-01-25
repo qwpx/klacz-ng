@@ -20,6 +20,7 @@ executable stateless
                        bytestring >=0.10 && <0.11, containers,
                        transformers, transformers-base, monads-tf,
                        cryptohash, protocol-buffers, protopap, klaczng-lib,
-                       lifted-base, zeromq4-haskell, monad-control
+                       lifted-base, zeromq4-haskell, monad-control,
+                       optparse-applicative
   -- hs-source-dirs:
   default-language:    Haskell2010
