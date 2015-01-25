@@ -1,15 +1,9 @@
-package IRC;
+package KlaczNG.IRC.Proto;
 
 message IrcMessage {
   optional string command = 1;
   optional string prefix = 2;
   repeated string params = 3;
-}
-
-message GatewayCommand {
-  optional string command = 1;
-  repeated string params = 2;
-  optional string rest = 3;
 }
 
 message UserCommand {
@@ -19,4 +13,15 @@ message UserCommand {
   optional string args = 4;
 }
 
+message SendGatewayMessageRequest {
+  optional IrcMessage irc_message = 1;
+}
 
+message SendGatewayMessageResponse {
+  optional string gateway_error = 1;
+}
+
+service GatewayService {
+  rpc SendGatewayMessage(SendGatewayMessageRequest)
+    returns (SendGatewayMessageResponse);
+}
