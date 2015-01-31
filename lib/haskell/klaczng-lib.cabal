@@ -22,6 +22,16 @@ library
                        KlaczNG.IRC.Proto.IrcMessage
                        KlaczNG.IRC.Proto.SendGatewayMessageRequest,
                        KlaczNG.IRC.Proto.SendGatewayMessageResponse,
+                       KlaczNG.Ephemeral.Proto,
+                       KlaczNG.Ephemeral.Proto.GetValueRequest,
+                       KlaczNG.Ephemeral.Proto.GetValueResponse,
+                       KlaczNG.Ephemeral.Proto.SetValueRequest,
+                       KlaczNG.Ephemeral.Proto.SetValueResponse,
+                       KlaczNG.Ephemeral.Proto.DeleteValueRequest,
+                       KlaczNG.Ephemeral.Proto.DeleteValueResponse,
+                       KlaczNG.Ephemeral.Proto.ClearRequest,
+                       KlaczNG.Ephemeral.Proto.ClearResponse,
+                       KlaczNG.Ephemeral.Proto.Status,
                        KlaczNG.Helpers
   -- other-modules:
   other-extensions:    BangPatterns, DeriveDataTypeable, FlexibleInstances, MultiParamTypeClasses

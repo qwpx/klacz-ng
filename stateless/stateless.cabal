@@ -19,7 +19,8 @@ executable stateless
   build-depends:       base >=4.7 && <4.8, text >=1.2 && <1.3,
                        bytestring >=0.10 && <0.11, containers,
                        transformers, transformers-base, monads-tf,
-                       cryptohash, protocol-buffers, protopap, klaczng-lib,
+                       cryptohash, protocol-buffers, protopap >= 0.1.0.2,
+                       klaczng-lib,
                        lifted-base, zeromq4-haskell, monad-control,
                        optparse-applicative
   -- hs-source-dirs:
