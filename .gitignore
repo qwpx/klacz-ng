@@ -4,3 +4,5 @@
 dropin.cache
 /config/gateway.json
 /.venv
+
+dist/

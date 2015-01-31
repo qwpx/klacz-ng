@@ -1,0 +1,58 @@
+package KlaczNG.Ephemeral.Proto;
+
+enum Status {
+  OK = 1;
+  NOT_FOUND = 2;
+  FAILED_PRECONDITION = 3;
+  INTERNAL_ERROR = 4;
+  UNKNOWN = 5;
+}
+
+message GetValueRequest {
+  optional string key = 1;
+}
+
+message GetValueResponse {
+  optional Status status = 1;
+  optional string status_info = 2;
+  optional bytes value = 3;
+}
+
+message SetValueRequest {
+  optional string key = 1;
+  optional bytes value = 2;
+}
+
+message SetValueResponse {
+  optional Status status = 1;
+  optional string status_info = 2;
+}
+
+message DeleteValueRequest {
+  optional string key = 1;
+}
+
+message DeleteValueResponse {
+  optional Status status = 1;
+  optional string status_info = 2;
+}
+
+message ClearRequest {
+  optional string ignore = 1;
+}
+
+message ClearResponse {
+  optional Status status = 1;
+  optional string status_info = 2;
+}
+
+service EphemeralService {
+  rpc GetValue(GetValueRequest)
+    returns (GetValueResponse);
+  rpc SetValue(GetValueRequest)
+    returns (GetValueResponse);
+  rpc DeleteValue(GetValueRequest)
+    returns (GetValueResponse);
+  rpc Clear(ClearRequest)
+    returns (ClearResponse);
+}
