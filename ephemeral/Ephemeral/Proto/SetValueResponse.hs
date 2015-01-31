@@ -1,14 +1,14 @@
 {-# LANGUAGE BangPatterns, DeriveDataTypeable, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
-module KlaczNG.Ephemeral.Proto.SetValueResponse (SetValueResponse(..)) where
+module Ephemeral.Proto.SetValueResponse (SetValueResponse(..)) where
 import Prelude ((+), (/))
 import qualified Prelude as Prelude'
 import qualified Data.Typeable as Prelude'
 import qualified Data.Data as Prelude'
 import qualified Text.ProtocolBuffers.Header as P'
-import qualified KlaczNG.Ephemeral.Proto.Status as KlaczNG.Ephemeral.Proto (Status)
+import qualified Ephemeral.Proto.Status as Ephemeral.Proto (Status)
  
-data SetValueResponse = SetValueResponse{status :: !(P'.Maybe KlaczNG.Ephemeral.Proto.Status), status_info :: !(P'.Maybe P'.Utf8)}
+data SetValueResponse = SetValueResponse{status :: !(P'.Maybe Ephemeral.Proto.Status), status_info :: !(P'.Maybe P'.Utf8)}
                       deriving (Prelude'.Show, Prelude'.Eq, Prelude'.Ord, Prelude'.Typeable, Prelude'.Data)
  
 instance P'.Mergeable SetValueResponse where
@@ -59,7 +59,7 @@ instance P'.ReflectDescriptor SetValueResponse where
   getMessageInfo _ = P'.GetMessageInfo (P'.fromDistinctAscList []) (P'.fromDistinctAscList [8, 18])
   reflectDescriptorInfo _
    = Prelude'.read
-      "DescriptorInfo {descName = ProtoName {protobufName = FIName \".KlaczNG.Ephemeral.Proto.SetValueResponse\", haskellPrefix = [], parentModule = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"SetValueResponse\"}, descFilePath = [\"KlaczNG\",\"Ephemeral\",\"Proto\",\"SetValueResponse.hs\"], isGroup = False, fields = fromList [FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".KlaczNG.Ephemeral.Proto.SetValueResponse.status\", haskellPrefix' = [], parentModule' = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\",MName \"SetValueResponse\"], baseName' = FName \"status\"}, fieldNumber = FieldId {getFieldId = 1}, wireTag = WireTag {getWireTag = 8}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 14}, typeName = Just (ProtoName {protobufName = FIName \".KlaczNG.Ephemeral.Proto.Status\", haskellPrefix = [], parentModule = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"Status\"}), hsRawDefault = Nothing, hsDefault = Nothing},FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".KlaczNG.Ephemeral.Proto.SetValueResponse.status_info\", haskellPrefix' = [], parentModule' = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\",MName \"SetValueResponse\"], baseName' = FName \"status_info\"}, fieldNumber = FieldId {getFieldId = 2}, wireTag = WireTag {getWireTag = 18}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 9}, typeName = Nothing, hsRawDefault = Nothing, hsDefault = Nothing}], keys = fromList [], extRanges = [], knownKeys = fromList [], storeUnknown = False, lazyFields = False}"
+      "DescriptorInfo {descName = ProtoName {protobufName = FIName \".Ephemeral.Proto.SetValueResponse\", haskellPrefix = [], parentModule = [MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"SetValueResponse\"}, descFilePath = [\"Ephemeral\",\"Proto\",\"SetValueResponse.hs\"], isGroup = False, fields = fromList [FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".Ephemeral.Proto.SetValueResponse.status\", haskellPrefix' = [], parentModule' = [MName \"Ephemeral\",MName \"Proto\",MName \"SetValueResponse\"], baseName' = FName \"status\"}, fieldNumber = FieldId {getFieldId = 1}, wireTag = WireTag {getWireTag = 8}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 14}, typeName = Just (ProtoName {protobufName = FIName \".Ephemeral.Proto.Status\", haskellPrefix = [], parentModule = [MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"Status\"}), hsRawDefault = Nothing, hsDefault = Nothing},FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".Ephemeral.Proto.SetValueResponse.status_info\", haskellPrefix' = [], parentModule' = [MName \"Ephemeral\",MName \"Proto\",MName \"SetValueResponse\"], baseName' = FName \"status_info\"}, fieldNumber = FieldId {getFieldId = 2}, wireTag = WireTag {getWireTag = 18}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 9}, typeName = Nothing, hsRawDefault = Nothing, hsDefault = Nothing}], keys = fromList [], extRanges = [], knownKeys = fromList [], storeUnknown = False, lazyFields = False}"
  
 instance P'.TextType SetValueResponse where
   tellT = P'.tellSubMessage

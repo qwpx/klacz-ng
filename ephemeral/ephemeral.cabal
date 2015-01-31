@@ -13,11 +13,32 @@ build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
 
+library
+  exposed-modules:     Ephemeral.Client
+                       Ephemeral.Proto,
+                       Ephemeral.Proto.GetValueRequest,
+                       Ephemeral.Proto.GetValueResponse,
+                       Ephemeral.Proto.SetValueRequest,
+                       Ephemeral.Proto.SetValueResponse,
+                       Ephemeral.Proto.DeleteValueRequest,
+                       Ephemeral.Proto.DeleteValueResponse,
+                       Ephemeral.Proto.ClearRequest,
+                       Ephemeral.Proto.ClearResponse,
+                       Ephemeral.Proto.Status
+  build-depends:       base >=4.7 && <4.8,
+                       protocol-buffers >=2.0 && <2.1,
+                       protocol-buffers-descriptor >=2.0 && <2.1,
+                       transformers, monads-tf,
+                       protopap, bytestring, text, zeromq4-haskell, klaczng-lib
+  default-language:    Haskell2010
+
 executable ephemeral
-  main-is:             Ephemeral.hs
+  main-is:             Ephemeral/Ephemeral.hs
   -- other-modules:
   -- other-extensions:
-  build-depends:       base >=4.7 && <4.8, protopap, klaczng-lib,
-                       unordered-containers, transformers, monads-tf
+  build-depends:       base >=4.7 && <4.8, protopap, klaczng-lib, zeromq4-haskell,
+                       transformers, monads-tf, lifted-base, monad-control,
+                       optparse-applicative, protocol-buffers,
+                       unordered-containers, lens, text, bytestring
   -- hs-source-dirs:
   default-language:    Haskell2010

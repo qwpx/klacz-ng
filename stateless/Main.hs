@@ -30,7 +30,7 @@ import Network.RPC.Protopap.Subscriber
 import Text.ProtocolBuffers.Basic (Utf8, utf8, toUtf8, defaultValue, uFromString)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 
-import Options.Applicative as Opt
+import Options.Applicative
 
 import System.Environment
 import qualified System.ZMQ4 as ZMQ
@@ -85,7 +85,7 @@ data StatelessEnv = StatelessEnv {
   gatewayRPCEndpoint :: String
   }
 
-type Stateless a =ReaderT StatelessEnv IO a
+type Stateless a = ReaderT StatelessEnv IO a
 
 runStateless = runReaderT
 

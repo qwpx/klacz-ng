@@ -1,15 +1,14 @@
 {-# LANGUAGE BangPatterns, DeriveDataTypeable, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
-module KlaczNG.Ephemeral.Proto.DeleteValueResponse (DeleteValueResponse(..)) where
+module Ephemeral.Proto.DeleteValueResponse (DeleteValueResponse(..)) where
 import Prelude ((+), (/))
 import qualified Prelude as Prelude'
 import qualified Data.Typeable as Prelude'
 import qualified Data.Data as Prelude'
 import qualified Text.ProtocolBuffers.Header as P'
-import qualified KlaczNG.Ephemeral.Proto.Status as KlaczNG.Ephemeral.Proto (Status)
+import qualified Ephemeral.Proto.Status as Ephemeral.Proto (Status)
  
-data DeleteValueResponse = DeleteValueResponse{status :: !(P'.Maybe KlaczNG.Ephemeral.Proto.Status),
-                                               status_info :: !(P'.Maybe P'.Utf8)}
+data DeleteValueResponse = DeleteValueResponse{status :: !(P'.Maybe Ephemeral.Proto.Status), status_info :: !(P'.Maybe P'.Utf8)}
                          deriving (Prelude'.Show, Prelude'.Eq, Prelude'.Ord, Prelude'.Typeable, Prelude'.Data)
  
 instance P'.Mergeable DeleteValueResponse where
@@ -60,7 +59,7 @@ instance P'.ReflectDescriptor DeleteValueResponse where
   getMessageInfo _ = P'.GetMessageInfo (P'.fromDistinctAscList []) (P'.fromDistinctAscList [8, 18])
   reflectDescriptorInfo _
    = Prelude'.read
-      "DescriptorInfo {descName = ProtoName {protobufName = FIName \".KlaczNG.Ephemeral.Proto.DeleteValueResponse\", haskellPrefix = [], parentModule = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"DeleteValueResponse\"}, descFilePath = [\"KlaczNG\",\"Ephemeral\",\"Proto\",\"DeleteValueResponse.hs\"], isGroup = False, fields = fromList [FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".KlaczNG.Ephemeral.Proto.DeleteValueResponse.status\", haskellPrefix' = [], parentModule' = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\",MName \"DeleteValueResponse\"], baseName' = FName \"status\"}, fieldNumber = FieldId {getFieldId = 1}, wireTag = WireTag {getWireTag = 8}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 14}, typeName = Just (ProtoName {protobufName = FIName \".KlaczNG.Ephemeral.Proto.Status\", haskellPrefix = [], parentModule = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"Status\"}), hsRawDefault = Nothing, hsDefault = Nothing},FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".KlaczNG.Ephemeral.Proto.DeleteValueResponse.status_info\", haskellPrefix' = [], parentModule' = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\",MName \"DeleteValueResponse\"], baseName' = FName \"status_info\"}, fieldNumber = FieldId {getFieldId = 2}, wireTag = WireTag {getWireTag = 18}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 9}, typeName = Nothing, hsRawDefault = Nothing, hsDefault = Nothing}], keys = fromList [], extRanges = [], knownKeys = fromList [], storeUnknown = False, lazyFields = False}"
+      "DescriptorInfo {descName = ProtoName {protobufName = FIName \".Ephemeral.Proto.DeleteValueResponse\", haskellPrefix = [], parentModule = [MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"DeleteValueResponse\"}, descFilePath = [\"Ephemeral\",\"Proto\",\"DeleteValueResponse.hs\"], isGroup = False, fields = fromList [FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".Ephemeral.Proto.DeleteValueResponse.status\", haskellPrefix' = [], parentModule' = [MName \"Ephemeral\",MName \"Proto\",MName \"DeleteValueResponse\"], baseName' = FName \"status\"}, fieldNumber = FieldId {getFieldId = 1}, wireTag = WireTag {getWireTag = 8}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 14}, typeName = Just (ProtoName {protobufName = FIName \".Ephemeral.Proto.Status\", haskellPrefix = [], parentModule = [MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"Status\"}), hsRawDefault = Nothing, hsDefault = Nothing},FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".Ephemeral.Proto.DeleteValueResponse.status_info\", haskellPrefix' = [], parentModule' = [MName \"Ephemeral\",MName \"Proto\",MName \"DeleteValueResponse\"], baseName' = FName \"status_info\"}, fieldNumber = FieldId {getFieldId = 2}, wireTag = WireTag {getWireTag = 18}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 9}, typeName = Nothing, hsRawDefault = Nothing, hsDefault = Nothing}], keys = fromList [], extRanges = [], knownKeys = fromList [], storeUnknown = False, lazyFields = False}"
  
 instance P'.TextType DeleteValueResponse where
   tellT = P'.tellSubMessage

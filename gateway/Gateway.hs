@@ -15,6 +15,7 @@ import Control.Concurrent.STM
 import Control.Lens
 
 import Data.Attoparsec.ByteString
+import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
@@ -38,6 +39,8 @@ import Options.Applicative
 
 import Text.ProtocolBuffers.Basic
 
+import qualified Ephemeral.Client as Ephemeral
+
 import KlaczNG.Helpers
 import KlaczNG.IRC.Proto.IrcMessage
 import KlaczNG.IRC.Proto.IrcMessage as IM
@@ -53,8 +56,7 @@ data GatewayEnv = GatewayEnv {
   _ircReaderChan :: TChan Message,
   _ircWriterChan :: TChan Message,
   _pubSocket :: ZMQ.Socket ZMQ.Pub,
-  _botNickname :: T.Text,
-  _botChannels :: [T.Text]
+  _ephemeralSocket :: ZMQ.Socket ZMQ.Req
   }
 
 $(makeLenses ''GatewayEnv)
@@ -62,6 +64,7 @@ $(makeLenses ''GatewayEnv)
 childDiesTMVar = unsafePerformIO newEmptyTMVarIO
 
 ircWriter handle chan = forever $ do
+  liftIO $ putStrLn $ "reading"
   msg <- atomically . readTChan $ chan
   putStrLn (show msg)
   hPutBSCrLf handle (encode msg)
@@ -80,6 +83,14 @@ ircReader handle chan = forever $ do
 type IRCGateway = StateT GatewayEnv IO
 runIRCGateway = runStateT
 
+getEphemeral :: Bin.Binary a => T.Text -> IRCGateway a
+getEphemeral key =  do
+  sock <- use ephemeralSocket
+  val <- fromMaybe (error $ "expecting " <> T.unpack key <> " in ephemeral") <$>
+         Ephemeral.getValue sock key
+  -- there are some weird TChan issues without this seq
+  val `seq` return (Bin.decode val)
+
 sendMessage :: Message -> IRCGateway ()
 sendMessage msg = do
   writerChan <- use ircWriterChan
@@ -92,14 +103,14 @@ readMessage = do
 
 registerToIrc :: IRCGateway ()
 registerToIrc = do
-  nickname <- textToBS <$> use botNickname
+  nickname <- getEphemeral "nickname"
   sendMessage (nick nickname)
   sendMessage (user nickname "8" "*" nickname)
 
 joinBotChannels :: Message -> IRCGateway ()
 joinBotChannels _ = do
-  channels <- use botChannels
-  mapM_ (sendMessage . joinChan . textToBS) channels
+  channels <- getEphemeral "channels"
+  mapM_ (sendMessage . joinChan) channels
 
 handlePing :: Message -> IRCGateway ()
 handlePing pingMessage = case msg_params pingMessage of
@@ -143,7 +154,7 @@ parseCommand nickname ircMessage = do
 
 maybePublishCommand :: Message -> IRCGateway ()
 maybePublishCommand ircMessage = do
-  nickname <- use botNickname
+  nickname <- textFromBS <$> getEphemeral "nickname"
   case msg_command ircMessage of
     "PRIVMSG" -> maybe (return ()) publishUserCommand $
                  parseCommand nickname ircMessage
@@ -219,26 +230,35 @@ start flags handle = do
 
   writerChan <- atomically $ newTChan
   forkChild "irc writer" $ ircWriter handle writerChan
-  let rpcE = flagZmqRpcEndpoint flags
-      pubE = flagZmqPubEndpoint flags
+  let gatewayRpcE = flagGatewayRpcEndpoint flags
+      gatewayPubE = flagGatewayPubEndpoint flags
+      ephemeralRpcE = flagEphemeralRpcEndpoint flags
       nickname = T.pack $ flagNickname flags
       channels = T.split (==',') . T.pack $ flagBotChannels flags
-  bracket (create rpcE pubE) destroy $
-    \(ctx, rpcSock, pubSock) -> do
-      forkChild "rpc server" $ gatewayRPCServer writerChan rpcSock
-      let env = GatewayEnv readerChan writerChan pubSock nickname channels
+  bracket (create gatewayRpcE gatewayPubE ephemeralRpcE) destroy $
+    \(ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock) -> do
+      Ephemeral.clear ephemeralRpcSock
+      Ephemeral.setValue ephemeralRpcSock "nickname" $
+        Bin.encode (textToBS nickname :: BS.ByteString)
+      Ephemeral.setValue ephemeralRpcSock "channels" $
+        Bin.encode (map textToBS channels :: [BS.ByteString])
+      forkChild "rpc server" $ gatewayRPCServer writerChan gatewayRpcSock
+      let env = GatewayEnv readerChan writerChan gatewayPubSock ephemeralRpcSock
       runIRCGateway gateway env
       return ()
-  where create rpcE pubE = do
+  where create gatewayRpcE gatewayPubE ephemeralRpcE = do
           ctx <- ZMQ.context
-          rpcSock <- ZMQ.socket ctx ZMQ.Rep
-          ZMQ.bind rpcSock rpcE
-          pubSock <- ZMQ.socket ctx ZMQ.Pub
-          ZMQ.bind pubSock pubE
-          return (ctx, rpcSock, pubSock)
-        destroy (ctx, rpcSock, pubSock) = do
-          ZMQ.close rpcSock
-          ZMQ.close pubSock
+          gatewayRpcSock <- ZMQ.socket ctx ZMQ.Rep
+          ZMQ.bind gatewayRpcSock gatewayRpcE
+          gatewayPubSock <- ZMQ.socket ctx ZMQ.Pub
+          ZMQ.bind gatewayPubSock gatewayPubE
+          ephemeralRpcSock <- ZMQ.socket ctx ZMQ.Req
+          ZMQ.connect ephemeralRpcSock ephemeralRpcE
+          return (ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock)
+        destroy (ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock) = do
+          ZMQ.close gatewayRpcSock
+          ZMQ.close gatewayPubSock
+          ZMQ.close ephemeralRpcSock
           ZMQ.term ctx
         forkChild :: String -> IO a -> IO ThreadId
         forkChild name m = forkFinally m (notifyParent name)
@@ -249,29 +269,25 @@ start flags handle = do
                 Right _ -> "Success" in
           atomically $ putTMVar childDiesTMVar (name ++ ": " ++ msg)
 
--- zmqRpcEndpoint = "tcp://*:9001"
--- zmqPubEndpoint = "tcp://*:2137"
--- botNickname = "klacz"
--- botUser = "klacz"
--- botRealName = "Klacz"
--- botIrcHost = "irc.freenode.net"
--- botChannels = ["#qwpx-dev", "#qwpx"]
-
 data Flags = Flags {
-  flagZmqRpcEndpoint :: String,
-  flagZmqPubEndpoint :: String,
+  flagGatewayRpcEndpoint :: String,
+  flagGatewayPubEndpoint :: String,
+  flagEphemeralRpcEndpoint :: String,
   flagIrcServer :: String,
   flagNickname :: String,
   flagBotChannels :: String
   }
 
 flags = Flags
-        <$> strOption (long "zmq-rpc-endpoint"
+        <$> strOption (long "gateway-rpc-endpoint"
                        <> metavar "RPC_ENDPOINT"
                        <> help "Address of GatewayService RPC")
-        <*> strOption (long "zmq-pub-endpoint"
+        <*> strOption (long "gateway-pub-endpoint"
                        <> metavar "PUB_ENDPOINT"
                        <> help "Address of Gateway Pub stream")
+        <*> strOption (long "ephemeral-rpc-endpoint"
+                       <> metavar "RPC_ENDPOINT"
+                       <> help "Address of EphemeralService RPC")
         <*> strOption (long "server"
                        <> metavar "SERVER"
                        <> help "Address of IRC server to join")

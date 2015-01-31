@@ -1,11 +1,10 @@
-package KlaczNG.Ephemeral.Proto;
+package Ephemeral.Proto;
 
 enum Status {
   OK = 1;
   NOT_FOUND = 2;
-  FAILED_PRECONDITION = 3;
-  INTERNAL_ERROR = 4;
-  UNKNOWN = 5;
+  INTERNAL_ERROR = 3;
+  UNKNOWN = 4;
 }
 
 message GetValueRequest {

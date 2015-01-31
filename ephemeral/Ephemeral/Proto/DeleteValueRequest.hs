@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, DeriveDataTypeable, FlexibleInstances, MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
-module KlaczNG.Ephemeral.Proto.DeleteValueRequest (DeleteValueRequest(..)) where
+module Ephemeral.Proto.DeleteValueRequest (DeleteValueRequest(..)) where
 import Prelude ((+), (/))
 import qualified Prelude as Prelude'
 import qualified Data.Typeable as Prelude'
@@ -55,7 +55,7 @@ instance P'.ReflectDescriptor DeleteValueRequest where
   getMessageInfo _ = P'.GetMessageInfo (P'.fromDistinctAscList []) (P'.fromDistinctAscList [10])
   reflectDescriptorInfo _
    = Prelude'.read
-      "DescriptorInfo {descName = ProtoName {protobufName = FIName \".KlaczNG.Ephemeral.Proto.DeleteValueRequest\", haskellPrefix = [], parentModule = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"DeleteValueRequest\"}, descFilePath = [\"KlaczNG\",\"Ephemeral\",\"Proto\",\"DeleteValueRequest.hs\"], isGroup = False, fields = fromList [FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".KlaczNG.Ephemeral.Proto.DeleteValueRequest.key\", haskellPrefix' = [], parentModule' = [MName \"KlaczNG\",MName \"Ephemeral\",MName \"Proto\",MName \"DeleteValueRequest\"], baseName' = FName \"key\"}, fieldNumber = FieldId {getFieldId = 1}, wireTag = WireTag {getWireTag = 10}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 9}, typeName = Nothing, hsRawDefault = Nothing, hsDefault = Nothing}], keys = fromList [], extRanges = [], knownKeys = fromList [], storeUnknown = False, lazyFields = False}"
+      "DescriptorInfo {descName = ProtoName {protobufName = FIName \".Ephemeral.Proto.DeleteValueRequest\", haskellPrefix = [], parentModule = [MName \"Ephemeral\",MName \"Proto\"], baseName = MName \"DeleteValueRequest\"}, descFilePath = [\"Ephemeral\",\"Proto\",\"DeleteValueRequest.hs\"], isGroup = False, fields = fromList [FieldInfo {fieldName = ProtoFName {protobufName' = FIName \".Ephemeral.Proto.DeleteValueRequest.key\", haskellPrefix' = [], parentModule' = [MName \"Ephemeral\",MName \"Proto\",MName \"DeleteValueRequest\"], baseName' = FName \"key\"}, fieldNumber = FieldId {getFieldId = 1}, wireTag = WireTag {getWireTag = 10}, packedTag = Nothing, wireTagLength = 1, isPacked = False, isRequired = False, canRepeat = False, mightPack = False, typeCode = FieldType {getFieldType = 9}, typeName = Nothing, hsRawDefault = Nothing, hsDefault = Nothing}], keys = fromList [], extRanges = [], knownKeys = fromList [], storeUnknown = False, lazyFields = False}"
  
 instance P'.TextType DeleteValueRequest where
   tellT = P'.tellSubMessage
