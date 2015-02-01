@@ -23,6 +23,7 @@ import Data.Monoid
 import Data.Sequence (fromList)
 import Data.Ord
 import Data.Text as T
+import qualified Data.Text.ICU as ICU
 import Data.Text.Encoding
 
 import Network.RPC.Protopap.Types
@@ -179,7 +180,8 @@ sageCommand replyTo caller args = do
           sock <- ephemeralRPCSock <$> ask
           botNickname <- fromMaybe "expected nickname in ephemeral"
                          <$> getEphemeral sock "nickname"
-          let (nick', reason') = if nick == botNickname
+          let (nick', reason') = if ICU.toLower ICU.Current nick ==
+                                    ICU.toLower ICU.Current botNickname
                                  then (caller, "na pana rękę podnosisz?")
                                  else (nick, reason)
           res <- sendGatewayMessage $ SendGatewayMessageRequest (

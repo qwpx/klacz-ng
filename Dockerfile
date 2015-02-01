@@ -17,7 +17,8 @@ RUN mkdir /opt/klaczng
 RUN chown -R klaczng:klaczng /opt/klaczng
 
 RUN apt-get -y update
-RUN apt-get -y install supervisor git libtool build-essential autoconf automake pkg-config wget
+RUN apt-get -y install libtool build-essential autoconf automake pkg-config \ 
+  supervisor git wget libicu-dev
 
 # Setup zeromq
 WORKDIR /tmp
@@ -39,7 +40,7 @@ env PATH=/opt/ghc/7.8.3/bin:/opt/cabal/1.20/bin:${PATH}
 RUN cabal-1.20 update
 RUN cabal-1.20 install protocol-buffers protocol-buffers-descriptor \
   uuid lens zeromq4-haskell lifted-base monad-control monads-tf transformers-base \
-  attoparsec irc network optparse-applicative
+  attoparsec irc network optparse-applicative text-icu aeson
 
 WORKDIR /tmp
 RUN git clone https://github.com/xyzzyz/protopap.git
@@ -55,8 +56,10 @@ RUN cabal configure && cabal install --global
 # Set up ephemeral/
 
 ADD ephemeral/ /srv/klaczng/ephemeral/
-WORKDIR /tmp/ephemeral
-RUN cabal configure && cabal install --global
+WORKDIR /srv/klaczng/ephemeral
+RUN mkdir /tmp/ephemeral-build
+RUN cabal-1.20 configure --builddir=/tmp/ephemeral-build \
+  && cabal-1.20 install --builddir=/tmp/ephemeral-build --prefix /opt/klaczng/ephemeral
 
 # Set up gateway
 

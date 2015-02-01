@@ -16,7 +16,7 @@ executable stateless
   main-is:             Stateless.hs
   -- other-modules:
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.7 && <4.8, text >=1.2 && <1.3, aeson,
+  build-depends:       base >=4.7 && <4.8, text, text-icu, aeson,
                        bytestring >=0.10 && <0.11, containers,
                        transformers, transformers-base, monads-tf, lens,
                        cryptohash, protocol-buffers, protopap >= 0.1.0.2,
