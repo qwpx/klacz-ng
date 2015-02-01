@@ -1,11 +1,11 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 module Main where
 
 import Control.Exception.Lifted
 import Control.Exception.Base(SomeException)
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans.State
+import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Maybe
 import Control.Monad.IO.Class
 
@@ -15,6 +15,7 @@ import Control.Concurrent.STM
 import Control.Lens
 
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.TH as AesonTH
 import Data.Attoparsec.ByteString
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -39,6 +40,7 @@ import Options.Applicative
 
 import Text.ProtocolBuffers.Basic
 
+import Ephemeral.JSON
 import qualified Ephemeral.Client as Ephemeral
 
 import KlaczNG.Helpers
@@ -48,6 +50,8 @@ import KlaczNG.IRC.Proto.UserCommand
 import KlaczNG.IRC.Proto.UserCommand as UC
 import KlaczNG.IRC.Proto.SendGatewayMessageRequest 
 import KlaczNG.IRC.Proto.SendGatewayMessageResponse
+
+import Config
 
 bsCrLf = BS.pack [13, 10]
 hPutBSCrLf handle bs = BS.hPut handle bs >> BS.hPut handle bsCrLf
@@ -61,10 +65,8 @@ data GatewayEnv = GatewayEnv {
 
 $(makeLenses ''GatewayEnv)
 
-childDiesTMVar = unsafePerformIO newEmptyTMVarIO
 
 ircWriter handle chan = forever $ do
-  liftIO $ putStrLn $ "reading"
   msg <- atomically . readTChan $ chan
   putStrLn (show msg)
   hPutBSCrLf handle (encode msg)
@@ -80,45 +82,39 @@ ircReader handle chan = forever $ do
       atomically $ writeTChan chan msg
     Nothing -> error $ "couldn't parse irc line: " ++ show (BS.unpack line)
 
-type IRCGateway = StateT GatewayEnv IO
-runIRCGateway = runStateT
-
-lookupEphemeral :: Aeson.FromJSON a => T.Text -> IRCGateway (Maybe a)
-lookupEphemeral key =  do
-  sock <- use ephemeralSocket
-  val <- Ephemeral.getValue sock key
-  return . join $ Aeson.decode <$> val
-
-getEphemeral :: Aeson.FromJSON a => T.Text -> IRCGateway a
-getEphemeral key = fromMaybe (error $ "expecting " <> T.unpack key <> " in ephemeral")
-                   <$> lookupEphemeral key
-
-setEphemeral :: Aeson.ToJSON a => T.Text -> a -> IRCGateway ()
-setEphemeral key value = do
-  sock <- use ephemeralSocket
-  Ephemeral.setValue sock key $ Aeson.encode [value]
+type IRCGateway = ReaderT GatewayEnv IO
+runIRCGateway = runReaderT
 
 sendMessage :: Message -> IRCGateway ()
 sendMessage msg = do
   msg `seq` return ()
-  writerChan <- use ircWriterChan
+  writerChan <- view ircWriterChan
   liftIO . atomically . writeTChan writerChan $ msg
 
 readMessage :: IRCGateway Message
 readMessage = do
-  readerChan <- use ircReaderChan
+  readerChan <- view ircReaderChan
   liftIO . atomically . readTChan $ readerChan
 
-registerToIrc :: IRCGateway ()
-registerToIrc = do
-  nickname <- textToBS <$> getEphemeral "nickname"
-  sendMessage (nick nickname)
-  sendMessage (user nickname "8" "*" nickname)
 
-joinBotChannels :: Message -> IRCGateway ()
-joinBotChannels _ = do
-  channels <- getEphemeral "channels"
+joinBotChannels :: IRCGateway ()
+joinBotChannels = do
+  sock <- view ephemeralSocket
+  channels <- fromMaybe (error "expected channels in ephemeral")
+              <$> getEphemeral sock "channels"
   mapM_ (sendMessage . joinChan . textToBS) channels
+
+nickservIdentify :: IRCGateway ()
+nickservIdentify = do
+  sock <- view ephemeralSocket
+  pass <- fromMaybe (error "expected nickserv password in ephemeral")
+          <$> getEphemeral sock "nickservPass"
+  sendMessage (privmsg "NickServ" (textToBS $ "IDENTIFY " <> pass))
+
+onLogin :: Message -> IRCGateway ()
+onLogin _ = do
+  nickservIdentify
+  joinBotChannels
 
 handlePing :: Message -> IRCGateway ()
 handlePing pingMessage = case msg_params pingMessage of
@@ -126,7 +122,7 @@ handlePing pingMessage = case msg_params pingMessage of
   _ -> error $ "incorrect ping message" ++ show pingMessage
 
 gatewayActions = M.fromList [
-  ("001", joinBotChannels),
+  ("001", onLogin),
   ("PING", handlePing)
   ]
 
@@ -162,20 +158,22 @@ parseCommand nickname ircMessage = do
 
 maybePublishCommand :: Message -> IRCGateway ()
 maybePublishCommand ircMessage = do
-  nickname <- getEphemeral "nickname"
+  sock <- view ephemeralSocket
+  nickname <- fromMaybe (error "expected nickname in ephemeral")
+              <$> getEphemeral sock "nickname"
   case msg_command ircMessage of
     "PRIVMSG" -> maybe (return ()) publishUserCommand $
                  parseCommand nickname ircMessage
     _ -> return ()
   where publishUserCommand command = do
           liftIO $ putStrLn ("Publishing " ++ show command)
-          sock <- use pubSocket
+          sock <- view pubSocket
           rpcPublish sock "UserCommand" command
 
 publishMessage :: Message -> IRCGateway ()
 publishMessage ircMessage = do
   let ircMessageProto = messageToIrcMessageProto ircMessage
-  sock <- use pubSocket
+  sock <- view pubSocket
   rpcPublish sock "IrcMessage" ircMessageProto
   return ()
 
@@ -203,15 +201,11 @@ ircMessageProtoToMessage (IrcMessage { IM.command = Just command,
       return $ msg { msg_prefix = Just prefix }
 
 gateway :: IRCGateway ()
-gateway = do
-  registerToIrc
-  gatewayLoop
-  where gatewayLoop :: IRCGateway ()
-        gatewayLoop = forever $ do
-          ircMessage <- readMessage
-          maybeGatewayAction ircMessage
-          maybePublishCommand ircMessage
-          publishMessage ircMessage
+gateway = forever $ do
+  ircMessage <- readMessage
+  maybeGatewayAction ircMessage
+  maybePublishCommand ircMessage
+  publishMessage ircMessage
 
 sendGatewayMessage :: TChan Message -> SendGatewayMessageRequest
                       -> IO (Either String SendGatewayMessageResponse)
@@ -231,28 +225,32 @@ gatewayRPCServer writerChan sock = do
   forever $ do
     handleRPCCall serviceDef sock
 
+childDiesTMVar = unsafePerformIO newEmptyTMVarIO
 
-start flags handle = do
+start flags ircConfig handle = do
   readerChan <- atomically $ newTChan
   forkChild "irc reader" $ ircReader handle readerChan
-
   writerChan <- atomically $ newTChan
   forkChild "irc writer" $ ircWriter handle writerChan
-  atomically $ writeTChan writerChan (nick "kek")
-  atomically $ writeTChan writerChan (error "lel")
-  atomically $ writeTChan writerChan (nick "wut")
+
   let gatewayRpcE = flagGatewayRpcEndpoint flags
       gatewayPubE = flagGatewayPubEndpoint flags
       ephemeralRpcE = flagEphemeralRpcEndpoint flags
-      nickname = T.pack $ flagNickname flags
-      channels = T.split (==',') . T.pack $ flagBotChannels flags
-  bracket (create gatewayRpcE gatewayPubE ephemeralRpcE) destroy $
+      nickname = ircNickname ircConfig
+      nickname' = textToBS nickname
+      channels = ircBotChannels ircConfig
+      nickservPass = ircNickServPass ircConfig
+
+  atomically $ writeTChan writerChan (nick nickname')
+  atomically $ writeTChan writerChan (user nickname' "8" "*" nickname')
+
+  forkChild "gateway " $
+    bracket (create gatewayRpcE gatewayPubE ephemeralRpcE) destroy $
     \(ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock) -> do
       Ephemeral.clear ephemeralRpcSock
-      Ephemeral.setValue ephemeralRpcSock "nickname" $
-        Aeson.encode [nickname]
-      Ephemeral.setValue ephemeralRpcSock "channels" $
-        Aeson.encode channels
+      setEphemeral ephemeralRpcSock "nickname" nickname
+      setEphemeral ephemeralRpcSock "channels" channels
+      setEphemeral ephemeralRpcSock "nickservPass" nickservPass
       forkChild "rpc server" $ gatewayRPCServer writerChan gatewayRpcSock
       let env = GatewayEnv readerChan writerChan gatewayPubSock ephemeralRpcSock
       runIRCGateway gateway env
@@ -284,9 +282,7 @@ data Flags = Flags {
   flagGatewayRpcEndpoint :: String,
   flagGatewayPubEndpoint :: String,
   flagEphemeralRpcEndpoint :: String,
-  flagIrcServer :: String,
-  flagNickname :: String,
-  flagBotChannels :: String
+  flagIrcConfig :: String
   }
 
 flags = Flags
@@ -299,15 +295,9 @@ flags = Flags
         <*> strOption (long "ephemeral-rpc-endpoint"
                        <> metavar "RPC_ENDPOINT"
                        <> help "Address of EphemeralService RPC")
-        <*> strOption (long "server"
-                       <> metavar "SERVER"
-                       <> help "Address of IRC server to join")
-        <*> strOption (long "nickname"
-                       <> metavar "NICK"
-                       <> help "Bot nickname")
-        <*> strOption (long "channels"
-                       <> metavar "CHANNEL1,CHANNEL2,..."
-                       <> help "Comma-separated list of IRC channels to join")
+        <*> strOption (long "irc-config"
+                       <> metavar "FILE"
+                       <> help "File with irc configuration")
 
 flagsOpts = info (helper <*> flags)
             ( fullDesc
@@ -316,13 +306,20 @@ flagsOpts = info (helper <*> flags)
 
 main :: IO ()
 main = execParser flagsOpts >>= \flags -> withSocketsDo $ do
-  addrs <- hostAddresses <$> getHostByName (flagIrcServer flags)
-  when (null addrs) $ error "unknown address"
-  sock <- socket AF_INET Stream 0
-  connect sock (SockAddrInet (toEnum 6667) (head addrs))
-  handle <- socketToHandle sock ReadWriteMode
-  hSetBuffering handle LineBuffering
-  start flags  handle
-  s <- atomically $ takeTMVar childDiesTMVar
-  putStrLn $ "Child died: " ++ s
-  return ()
+  config <- openFile (flagIrcConfig flags) ReadMode
+            >>= (Aeson.eitherDecode <$>) . LBS.hGetContents
+  case config of
+    Left err -> putStrLn err
+    Right config'@(IRCConfig { ircServer = ircServer,
+                               ircNickname = ircNickname,
+                               ircBotChannels = ircBotChannels }) -> do
+      addrs <- hostAddresses <$> getHostByName (T.unpack ircServer)
+      when (null addrs) $ error "unknown address"
+      sock <- socket AF_INET Stream 0
+      connect sock (SockAddrInet (toEnum 6667) (head addrs))
+      handle <- socketToHandle sock ReadWriteMode
+      hSetBuffering handle LineBuffering
+      start flags config' handle
+      s <- atomically $ takeTMVar childDiesTMVar
+      putStrLn $ "Child died: " ++ s
+      return ()

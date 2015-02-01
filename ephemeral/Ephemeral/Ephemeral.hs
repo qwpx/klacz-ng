@@ -96,6 +96,7 @@ getValue req = case GetValueRequest.key req of
   Nothing -> return . Left $ "No key provided"
   Just k -> do
     map <- use kvStore
+    liftIO $ putStrLn (show map)
     case HM.lookup (uToText k) map of
       Nothing -> return . Right $ GetValueResponse {
         GetValueResponse.status = Just Status.NOT_FOUND,
