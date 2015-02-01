@@ -13,7 +13,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 executable stateless
-  main-is:             Main.hs
+  main-is:             Stateless.hs
   -- other-modules:
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.7 && <4.8, text >=1.2 && <1.3,

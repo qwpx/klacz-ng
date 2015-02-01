@@ -52,6 +52,12 @@ ADD lib/haskell/ /tmp/haskell/
 WORKDIR /tmp/haskell
 RUN cabal configure && cabal install --global
 
+# Set up ephemeral/
+
+ADD ephemeral/ /srv/klaczng/ephemeral/
+WORKDIR /tmp/ephemeral
+RUN cabal configure && cabal install --global
+
 # Set up gateway
 
 ADD gateway/ /srv/klaczng/gateway

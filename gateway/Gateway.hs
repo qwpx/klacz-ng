@@ -14,8 +14,8 @@ import Control.Concurrent.STM
 
 import Control.Lens
 
+import qualified Data.Aeson as Aeson
 import Data.Attoparsec.ByteString
-import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
@@ -83,16 +83,24 @@ ircReader handle chan = forever $ do
 type IRCGateway = StateT GatewayEnv IO
 runIRCGateway = runStateT
 
-getEphemeral :: Bin.Binary a => T.Text -> IRCGateway a
-getEphemeral key =  do
+lookupEphemeral :: Aeson.FromJSON a => T.Text -> IRCGateway (Maybe a)
+lookupEphemeral key =  do
   sock <- use ephemeralSocket
-  val <- fromMaybe (error $ "expecting " <> T.unpack key <> " in ephemeral") <$>
-         Ephemeral.getValue sock key
-  -- there are some weird TChan issues without this seq
-  val `seq` return (Bin.decode val)
+  val <- Ephemeral.getValue sock key
+  return . join $ Aeson.decode <$> val
+
+getEphemeral :: Aeson.FromJSON a => T.Text -> IRCGateway a
+getEphemeral key = fromMaybe (error $ "expecting " <> T.unpack key <> " in ephemeral")
+                   <$> lookupEphemeral key
+
+setEphemeral :: Aeson.ToJSON a => T.Text -> a -> IRCGateway ()
+setEphemeral key value = do
+  sock <- use ephemeralSocket
+  Ephemeral.setValue sock key $ Aeson.encode [value]
 
 sendMessage :: Message -> IRCGateway ()
 sendMessage msg = do
+  msg `seq` return ()
   writerChan <- use ircWriterChan
   liftIO . atomically . writeTChan writerChan $ msg
 
@@ -103,14 +111,14 @@ readMessage = do
 
 registerToIrc :: IRCGateway ()
 registerToIrc = do
-  nickname <- getEphemeral "nickname"
+  nickname <- textToBS <$> getEphemeral "nickname"
   sendMessage (nick nickname)
   sendMessage (user nickname "8" "*" nickname)
 
 joinBotChannels :: Message -> IRCGateway ()
 joinBotChannels _ = do
   channels <- getEphemeral "channels"
-  mapM_ (sendMessage . joinChan) channels
+  mapM_ (sendMessage . joinChan . textToBS) channels
 
 handlePing :: Message -> IRCGateway ()
 handlePing pingMessage = case msg_params pingMessage of
@@ -154,7 +162,7 @@ parseCommand nickname ircMessage = do
 
 maybePublishCommand :: Message -> IRCGateway ()
 maybePublishCommand ircMessage = do
-  nickname <- textFromBS <$> getEphemeral "nickname"
+  nickname <- getEphemeral "nickname"
   case msg_command ircMessage of
     "PRIVMSG" -> maybe (return ()) publishUserCommand $
                  parseCommand nickname ircMessage
@@ -213,7 +221,7 @@ sendGatewayMessage writerChan request = do
     Just msgProto -> case ircMessageProtoToMessage msgProto of
       Left err -> return (Left err)
       Right msg -> do
-        atomically $ writeTChan writerChan msg
+        atomically $ writeTChan writerChan $! msg
         return . Right $ SendGatewayMessageResponse Nothing
 
 gatewayRPCServer writerChan sock = do
@@ -230,6 +238,9 @@ start flags handle = do
 
   writerChan <- atomically $ newTChan
   forkChild "irc writer" $ ircWriter handle writerChan
+  atomically $ writeTChan writerChan (nick "kek")
+  atomically $ writeTChan writerChan (error "lel")
+  atomically $ writeTChan writerChan (nick "wut")
   let gatewayRpcE = flagGatewayRpcEndpoint flags
       gatewayPubE = flagGatewayPubEndpoint flags
       ephemeralRpcE = flagEphemeralRpcEndpoint flags
@@ -239,9 +250,9 @@ start flags handle = do
     \(ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock) -> do
       Ephemeral.clear ephemeralRpcSock
       Ephemeral.setValue ephemeralRpcSock "nickname" $
-        Bin.encode (textToBS nickname :: BS.ByteString)
+        Aeson.encode [nickname]
       Ephemeral.setValue ephemeralRpcSock "channels" $
-        Bin.encode (map textToBS channels :: [BS.ByteString])
+        Aeson.encode channels
       forkChild "rpc server" $ gatewayRPCServer writerChan gatewayRpcSock
       let env = GatewayEnv readerChan writerChan gatewayPubSock ephemeralRpcSock
       runIRCGateway gateway env
