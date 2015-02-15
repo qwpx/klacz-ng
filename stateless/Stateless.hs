@@ -16,7 +16,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Either
-import Data.Foldable
+import Data.Foldable(toList)
 import Data.Functor
 import Data.List
 import qualified Data.Map as M
@@ -24,7 +24,8 @@ import Data.Maybe
 import Data.Monoid
 import Data.Sequence (fromList)
 import Data.Ord
-import Data.Text as T
+import Data.Text(Text)
+import qualified Data.Text as T
 import qualified Data.Text.ICU as ICU
 import Data.Text.Encoding
 
@@ -187,6 +188,18 @@ reply replyTo text = do
     Left callError -> liftIO . Prelude.putStrLn $ "Error during reply: " ++ show callError
     Right _ -> return ()
 
+replyLinesMax = 4
+
+replyMultiline :: Text -> [Text] -> Stateless ()
+replyMultiline replyTo lines = do
+  let (now, later) = splitAt replyLinesMax lines
+  mapM_ (reply replyTo) now
+  unless (null later) $ do
+    reply replyTo $ "But wait, there's more! " <>
+      "(" <> (T.pack . show . length $ later) <> " more, type ,more)"
+  sock <- ephemeralRPCSock <$> ask
+  setEphemeral sock "more" later
+
 parseArgs :: Int -> T.Text -> [T.Text]
 parseArgs n t = parseArgs' n (T.strip t)
   where parseArgs' 1 t = [t]
@@ -196,11 +209,22 @@ parseArgs n t = parseArgs' n (T.strip t)
 type StatelessCommand = Text -> Text -> Text -> Stateless ()
 commands :: M.Map Text StatelessCommand
 commands = M.fromList [
+  ("more", moreCommand),
   ("pick", pickCommand),
   ("sage", sageCommand),
   ("add", addCommand),
   ("describe", describeCommand)
   ]
+
+moreCommand :: Text -> Text -> Text -> Stateless ()
+moreCommand replyTo caller args = do
+  sock <- ephemeralRPCSock <$> ask
+  moreLines <- getEphemeral sock "more"
+  case moreLines of
+    Nothing -> reply replyTo "No more lines."
+    Just [] -> reply replyTo "No more lines."
+    Just moreLines -> replyMultiline replyTo moreLines
+
 
 pick :: Text -> Text
 pick = T.intercalate " < " . sortBy (comparing (CH.hash . encodeUtf8)) . T.words
@@ -216,7 +240,7 @@ sageCommand replyTo caller args = do
     [] -> sageWithReason caller caller
   where sageWithReason nick reason = do
           sock <- ephemeralRPCSock <$> ask
-          botNickname <- fromMaybe "expected nickname in ephemeral"
+          botNickname <- fromMaybe (error "expected nickname in ephemeral")
                          <$> getEphemeral sock "nickname"
           let (nick', reason') = if ICU.toLower ICU.Current nick ==
                                     ICU.toLower ICU.Current botNickname
@@ -314,13 +338,13 @@ describeCommand replyTo caller args = do
               case entries of
                 Left err -> reply replyTo $
                             "Error while getting entries: " <> T.pack (show err)
-                Right entries' -> replyWithEntries entries'
-        replyWithEntries entries = do
-          zipWithM_ sendEntry [0..] entries
-        sendEntry n entry = reply replyTo $
-                            ("[" <> T.pack (show n) <> "] " <> (uToText $
-                            fromMaybe (error "expected text in entry")
-                            (Entry.text entry)))
+                Right entries' -> replyMultiline replyTo (prepareEntries entries')
+        prepareEntries entries = do
+         zipWith prepareEntry [0..] entries
+        prepareEntry n entry = ("[" <> T.pack (show n) <> "] " <>
+                                (uToText $
+                                 fromMaybe (error "expected text in entry")
+                                 (Entry.text entry)))
 
 
 
