@@ -20,7 +20,7 @@ executable stateless
                        bytestring >=0.10 && <0.11, containers,
                        transformers, transformers-base, monads-tf, lens,
                        cryptohash, protocol-buffers, protopap >= 0.1.0.2,
-                       klaczng-lib, ephemeral,
+                       klaczng-lib, ephemeral, persistent,
                        lifted-base, zeromq4-haskell, monad-control,
                        optparse-applicative
   -- hs-source-dirs:

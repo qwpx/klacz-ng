@@ -15,6 +15,8 @@ import Crypto.Hash.SHA1 as CH
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import Data.Either
+import Data.Foldable
 import Data.Functor
 import Data.List
 import qualified Data.Map as M
@@ -48,10 +50,32 @@ import KlaczNG.Helpers
 
 import Ephemeral.JSON
 
+import Persistent.Proto.Term
+import Persistent.Proto.Term as Term
+import Persistent.Proto.Entry
+import Persistent.Proto.Entry as Entry
+import Persistent.Proto.CreateTermRequest
+import Persistent.Proto.CreateTermRequest as CreateTermRequest
+import Persistent.Proto.CreateTermResponse
+import Persistent.Proto.CreateTermResponse as CreateTermResponse
+import Persistent.Proto.GetTermRequest
+import Persistent.Proto.GetTermRequest as GetTermRequest
+import Persistent.Proto.GetTermResponse
+import Persistent.Proto.GetTermResponse as GetTermResponse
+import Persistent.Proto.CreateEntryRequest
+import Persistent.Proto.CreateEntryRequest as CreateEntryRequest
+import Persistent.Proto.CreateEntryResponse
+import Persistent.Proto.CreateEntryResponse as CreateEntryResponse
+import Persistent.Proto.GetEntriesRequest
+import Persistent.Proto.GetEntriesRequest as GetEntriesRequest
+import Persistent.Proto.GetEntriesResponse
+import Persistent.Proto.GetEntriesResponse as GetEntriesResponse
+
 data Flags = Flags {
   gatewayRpcEndpoint :: String,
   gatewayPubEndpoint :: String,
-  ephemeralRpcEndpoint :: String
+  ephemeralRpcEndpoint :: String,
+  persistentRpcEndpoint :: String
   }
 
 flags = Flags
@@ -61,9 +85,12 @@ flags = Flags
         <*> strOption (long "gateway-pub-endpoint"
                        <> metavar "PUB_ENDPOINT"
                        <> help "Address of Gateway Pub stream")
-        <*> strOption (long "ephemeral-pub-endpoint"
-                       <> metavar "PUB_ENDPOINT"
+        <*> strOption (long "ephemeral-rpc-endpoint"
+                       <> metavar "RPC_ENDPOINT"
                        <> help "Address of Ephemeral RPC")
+        <*> strOption (long "persistent-rpc-endpoint"
+                       <> metavar "RPC_ENDPOINT"
+                       <> help "Address of Persistent RPC")
 
 flagsOpts = info (helper <*> flags)
             ( fullDesc
@@ -72,12 +99,13 @@ flagsOpts = info (helper <*> flags)
 
 main :: IO ()
 main = execParser flagsOpts >>= \flags ->
-  subscribe (gatewayRpcEndpoint flags) (gatewayPubEndpoint flags) (ephemeralRpcEndpoint flags)
+  subscribe (gatewayRpcEndpoint flags) (gatewayPubEndpoint flags) (ephemeralRpcEndpoint flags) (persistentRpcEndpoint flags)
 
-subscribe :: String -> String -> String -> IO ()
-subscribe gatewayRpcEndpoint gatewayPubEndpoint ephemeralRpcEndpoint = do
-  bracket create destroy $ \(_, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock) -> do
-    runStateless (subscriberLoop gatewayPubSock) (StatelessEnv gatewayRpcSock ephemeralRpcSock)
+subscribe :: String -> String -> String -> String -> IO ()
+subscribe gatewayRpcEndpoint gatewayPubEndpoint ephemeralRpcEndpoint persistentRpcEndpoint = do
+  bracket create destroy $ \(_, gatewayRpcSock, gatewayPubSock,
+                             ephemeralRpcSock, persistentRpcSock) -> do
+    runStateless (subscriberLoop gatewayPubSock) (StatelessEnv gatewayRpcSock ephemeralRpcSock persistentRpcSock)
     return ()
   where create = do
           ctx <- ZMQ.context
@@ -88,17 +116,25 @@ subscribe gatewayRpcEndpoint gatewayPubEndpoint ephemeralRpcEndpoint = do
           ZMQ.subscribe gatewayPubSock ""
           ephemeralRpcSock <- ZMQ.socket ctx ZMQ.Req
           ZMQ.connect ephemeralRpcSock ephemeralRpcEndpoint
-          return (ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock)
-        destroy (ctx, gatewayRpcSock, gatewayPubSock, ephemeralRpcSock) = do
+          persistentRpcSock <- ZMQ.socket ctx ZMQ.Req
+          ZMQ.connect persistentRpcSock persistentRpcEndpoint
+          return (ctx,
+                  gatewayRpcSock, gatewayPubSock,
+                  ephemeralRpcSock, persistentRpcSock)
+        destroy (ctx,
+                 gatewayRpcSock, gatewayPubSock,
+                 ephemeralRpcSock, persistentRpcSock) = do
           ZMQ.close gatewayRpcSock
           ZMQ.close gatewayPubSock
           ZMQ.close ephemeralRpcSock
+          ZMQ.close persistentRpcSock
           ZMQ.term ctx
 
 
 data StatelessEnv = StatelessEnv {
   gatewayRPCSock :: ZMQ.Socket ZMQ.Req,
-  ephemeralRPCSock :: ZMQ.Socket ZMQ.Req
+  ephemeralRPCSock :: ZMQ.Socket ZMQ.Req,
+  persistentRPCSock :: ZMQ.Socket ZMQ.Req
   }
 
 type Stateless a = ReaderT StatelessEnv IO a
@@ -161,7 +197,9 @@ type StatelessCommand = Text -> Text -> Text -> Stateless ()
 commands :: M.Map Text StatelessCommand
 commands = M.fromList [
   ("pick", pickCommand),
-  ("sage", sageCommand)
+  ("sage", sageCommand),
+  ("add", addCommand),
+  ("describe", describeCommand)
   ]
 
 pick :: Text -> Text
@@ -196,6 +234,93 @@ sageCommand replyTo caller args = do
                               "Error during sage: " ++ show callError
             Right _ -> return ()
 
+-- these should probably be moved to Persistent
+getTerm :: Text -> Stateless (Either RPCCallError (Maybe Term))
+getTerm termName = do
+  sock <- persistentRPCSock <$> ask
+  res <- rpcCall sock "GetTerm" $ GetTermRequest {
+    GetTermRequest.name = Just . uFromText $ termName }
+  case res of
+    Left err -> return (Left err)
+    Right app_res -> return . Right . GetTermResponse.term $ app_res
+
+createTerm :: Text -> Stateless (Either RPCCallError Term)
+createTerm termName = do
+  sock <- persistentRPCSock <$> ask
+  res <- rpcCall sock "CreateTerm" $ CreateTermRequest {
+    CreateTermRequest.name = Just $ uFromText termName }
+  case res of
+    Left err -> return $ Left err
+    Right app_res -> return . Right $
+                     fromMaybe (error "expected term in CreateTermResponse")
+                     (CreateTermResponse.term app_res)
+
+getOrCreateTerm :: Text -> Stateless (Either RPCCallError Term)
+getOrCreateTerm termName = do
+  res <- getTerm termName
+  case res of
+    Left err -> return $ Left err
+    Right (Just t) -> return $ Right t
+    Right Nothing -> createTerm termName
+
+addEntryToTerm :: Term -> Text -> Text -> Stateless (Either RPCCallError Entry)
+addEntryToTerm term author entry = do
+  sock <- persistentRPCSock <$> ask
+  res <- rpcCall sock "CreateEntry" $ CreateEntryRequest {
+    CreateEntryRequest.term = Just $ term,
+    CreateEntryRequest.author = Just $ uFromText author,
+    CreateEntryRequest.text = Just $ uFromText entry }
+  return (fromMaybe (error "expected entry in CreateEntryResponse")
+          . CreateEntryResponse.entry <$> res)
+
+getEntries :: Term -> Stateless (Either RPCCallError [Entry])
+getEntries term = do
+  sock <- persistentRPCSock <$> ask
+  res <- rpcCall sock "GetEntries" $ GetEntriesRequest {
+    GetEntriesRequest.term = Just term }
+  return (toList . GetEntriesResponse.entries <$> res)
+
+addCommand :: Text -> Text -> Text -> Stateless ()
+addCommand replyTo caller args = do
+  case parseArgs 2 args of
+    (termName:entry:_) -> newEntry termName entry
+    _ -> reply replyTo "syntax error, expected ,add TERM ENTRY..."
+  where newEntry termName entry = do
+          term <- getOrCreateTerm termName
+          case term of
+            Left err -> reply replyTo $
+                        "Error while getting term: " <> T.pack (show err)
+            Right term' -> do
+              res' <- addEntryToTerm term' caller entry
+              case res' of
+                Left err -> reply replyTo $
+                            "Error while adding entry: " <> T.pack (show err)
+                Right _ -> reply replyTo $
+                           "Added entry to term " <> termName
+
+describeCommand :: Text -> Text -> Text -> Stateless ()
+describeCommand replyTo caller args = do
+  case parseArgs 1 args of
+    (termName:_) -> describe termName
+    _ -> reply replyTo "syntax error, expected ,describe TERM"
+  where describe termName = do
+          term <- getTerm termName
+          case term of
+            Left err -> reply replyTo $
+                        "Error while getting term: " <> T.pack (show err)
+            Right Nothing -> reply replyTo $ "No such term: " <> termName
+            Right (Just term') -> do
+              entries <- getEntries term'
+              case entries of
+                Left err -> reply replyTo $
+                            "Error while getting entries: " <> T.pack (show err)
+                Right entries' -> replyWithEntries entries'
+        replyWithEntries entries = do
+          zipWithM_ sendEntry [0..] entries
+        sendEntry n entry = reply replyTo $
+                            ("[" <> T.pack (show n) <> "] " <> (uToText $
+                            fromMaybe (error "expected text in entry")
+                            (Entry.text entry)))
 
 
 

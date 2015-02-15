@@ -1,0 +1,30 @@
+name:                persistent
+version:             0.1.0.0
+synopsis:            RPC interface to persistent Klacz-ng store
+-- description:
+homepage:            http://github.com/qwpx/klacz-ng
+license:             GPL-3
+author:              Adam Michalik
+maintainer:          adam@michalik.es
+-- copyright:
+-- category:
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Persistent.Proto,
+                       Persistent.Proto.Term,
+                       Persistent.Proto.Entry,
+                       Persistent.Proto.CreateTermRequest,
+                       Persistent.Proto.CreateTermResponse,
+                       Persistent.Proto.GetTermRequest,
+                       Persistent.Proto.GetTermResponse,
+                       Persistent.Proto.CreateEntryRequest,
+                       Persistent.Proto.CreateEntryResponse,
+                       Persistent.Proto.GetEntriesRequest,
+                       Persistent.Proto.GetEntriesResponse
+  build-depends:       base >=4.7 && <4.8,
+                       protocol-buffers >=2.0 && <2.1,
+                       protocol-buffers-descriptor >=2.0 && <2.1
+  default-language:    Haskell2010
